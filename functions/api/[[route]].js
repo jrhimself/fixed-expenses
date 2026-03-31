@@ -600,6 +600,14 @@ async function handlePeriodes(path, method, request, env) {
     return Response.json({ genegeerd: result.meta.changes });
   }
 
+  // POST /periodes/:id/accepteer-afwijking-eenmalig/:last_id
+  if ((m = matchPath('/periodes/:id/accepteer-afwijking-eenmalig/:last_id', path)) && method === 'POST') {
+    const result = await env.DB.prepare(
+      'UPDATE bank_transacties SET bedrag_afwijking_geaccepteerd=1 WHERE periode_id=? AND gekoppeld_last_id=? AND genegeerd=0'
+    ).bind(m.id, m.last_id).run();
+    return Response.json({ ok: true, updated: result.meta.changes });
+  }
+
   // POST /periodes/:id/negeer/:transactie_id
   if ((m = matchPath('/periodes/:id/negeer/:transactie_id', path)) && method === 'POST') {
     await env.DB.prepare('UPDATE bank_transacties SET genegeerd=1 WHERE id=? AND periode_id=?')

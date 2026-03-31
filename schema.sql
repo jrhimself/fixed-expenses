@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS bank_transacties (
   periode_id INTEGER REFERENCES periodes(id),
   gekoppeld_last_id INTEGER REFERENCES vaste_lasten(id),
   handmatig_gekoppeld INTEGER DEFAULT 0,
-  genegeerd INTEGER DEFAULT 0
+  genegeerd INTEGER DEFAULT 0,
+  bedrag_afwijking_geaccepteerd INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS periode_overgeslagen (
