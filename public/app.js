@@ -144,7 +144,8 @@ function openModalLast(id, vanuitDashboard = false) {
     // Bepaal databron: dashboard (jaar-overrides al gemergd) of globale lijst
     const vanDashboard = vanuitDashboard && huidigePeriodeId;
     const l = vanDashboard
-      ? dashboardOverzicht.find(x => x.id === id)
+      ? (dashboardOverzicht.find(x => x.id === id && x.periode_id === huidigePeriodeId)
+         || dashboardOverzicht.find(x => x.id === id))
       : allLasten.find(x => x.id === id);
     if (!l) return;
 
@@ -194,6 +195,15 @@ async function submitLast(e) {
     // Hide in all previous periods of this year so it only propagates forward
     if (huidigePeriodeId && res.id) {
       await api(`/api/lasten/${res.id}/activeer-vanaf-periode/${huidigePeriodeId}`, { method: 'POST' });
+      // Prevent automatic propagation to next year
+      const huidigePeriode = allPeriodes.find(p => p.id === huidigePeriodeId);
+      if (huidigePeriode) {
+        const volgendJaar = new Date(huidigePeriode.start_datum).getFullYear() + 1;
+        await api(`/api/lasten/${res.id}/jaar/${volgendJaar}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actief: 0, vanaf_datum: '0000-00-00' })
+        });
+      }
     }
   }
   sluitModal('modal-last');
@@ -231,6 +241,17 @@ async function deactiveerLastInPeriode(id) {
 }
 
 // Per-periode activering (vanuit dashboard kebab, voor periode-inactieve last)
+async function activeerLastVoorJaar(lastId) {
+  const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+  if (!periode) return;
+  const jaar = new Date(periode.start_datum).getFullYear();
+  await api(`/api/lasten/${lastId}/jaar/${jaar}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actief: 1, vanaf_datum: '0000-00-00' })
+  });
+  laadDashboard();
+}
+
 async function activeerLastInPeriode(id) {
   if (!huidigePeriodeId) return;
   await api(`/api/periodes/${huidigePeriodeId}/activeer-last/${id}`, { method: 'POST' });
@@ -467,7 +488,7 @@ function renderDashboardTabel() {
         <div class="acties-dropdown">${menuItems.join('')}</div>
       </div>`;
     const vierdeKolom = isAlleMode
-      ? `<td${dimStijl}>${periodeLabel || '—'}</td>`
+      ? `<td${dimStijl}>${periodeLabel || '—'}</td><td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>`
       : `<td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>`;
     return `<tr${bedragAfwijking ? ' class="bedrag-afwijking"' : ''}>
       <td${dimStijl}><strong>${esc(o.naam)}</strong></td>
@@ -480,12 +501,12 @@ function renderDashboardTabel() {
     </tr>`;
   }).join('');
 
-  const colspan = 7;
+  const colspan = isAlleMode ? 8 : 7;
   const geenResultaat = gefilterd.length === 0
     ? `<tr><td colspan="${colspan}" class="empty">Geen resultaten voor deze filter.</td></tr>` : '';
 
   const headers = isAlleMode
-    ? '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Periode</th><th>Status</th><th>Afschrijving</th><th>Acties</th>'
+    ? '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Periode</th><th>Dag</th><th>Status</th><th>Afschrijving</th><th>Acties</th>'
     : '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Dag v/d maand</th><th>Status</th><th>Afschrijving</th><th>Acties</th>';
 
   document.getElementById('dashboard-card').innerHTML = `
@@ -495,6 +516,23 @@ function renderDashboardTabel() {
     </table>`;
 
   renderInactieveLasten();
+  renderJaarVerwijderd();
+}
+
+function renderJaarVerwijderd() {
+  const sectie = document.getElementById('jaar-verwijderd-sectie');
+  if (!huidigePeriodeId || !dashboardJaarVerwijderd.length) { sectie.style.display = 'none'; return; }
+  sectie.style.display = 'block';
+  document.getElementById('jaar-verwijderd-body').innerHTML = dashboardJaarVerwijderd.map(l => `
+    <tr style="opacity:.6">
+      <td><strong>${esc(l.naam)}</strong></td>
+      <td>${euro(l.bedrag)}</td>
+      <td>${esc(l.categorie || '—')}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-sm btn-secondary" onclick="activeerLastVoorJaar(${l.id})">Activeer voor dit jaar</button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 async function verwijderLastInJaar(id) {
