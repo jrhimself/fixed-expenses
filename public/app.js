@@ -424,7 +424,8 @@ function renderDashboardTabel() {
 
   const rijen = gefilterd.map(o => {
     const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
-    const bedragAfwijking = !o.variabel && o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
+    const eenmaligGeaccepteerd = o.betaling?.bedrag_afwijking_geaccepteerd === 1;
+    const bedragAfwijking = !o.variabel && !eenmaligGeaccepteerd && o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
       Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
 
     // ctx: set period context first when in alle-modus
@@ -474,7 +475,7 @@ function renderDashboardTabel() {
       <td${dimStijl}>${esc(o.categorie || '—')}</td>
       ${vierdeKolom}
       <td${dimStijl}><span class="badge ${o.status}">${statusLabel(o.status)}</span></td>
-      <td${dimStijl} style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}` : o.handmatig_betaald ? '<em>handmatig</em>' : '—'}</td>
+      <td${dimStijl} style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}${eenmaligGeaccepteerd ? ' <span title="Bedrag eenmalig geaccepteerd" style="color:#d97706;font-weight:600">~</span>' : ''}` : o.handmatig_betaald ? '<em>handmatig</em>' : '—'}</td>
       <td style="white-space:nowrap">${acties}</td>
     </tr>`;
   }).join('');
@@ -640,13 +641,19 @@ function toonMatchDetail(lastId, periodeId = null) {
   const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
   const heeftAfwijking = !o.variabel && Math.abs(Math.abs(t.bedrag) - o.bedrag) > afwijkingDrempel;
   const accepteerKnop = document.getElementById('btn-accepteer-bedrag');
+  const accepteerEenmaligKnop = document.getElementById('btn-accepteer-bedrag-eenmalig');
   if (heeftAfwijking) {
     accepteerKnop.textContent = `Accepteer ${euro(Math.abs(t.bedrag))} als nieuw bedrag`;
     accepteerKnop.dataset.lastId = lastId;
     accepteerKnop.dataset.periodeId = periodeId || '';
     accepteerKnop.style.display = '';
+    accepteerEenmaligKnop.textContent = `Accepteer ${euro(Math.abs(t.bedrag))} eenmalig`;
+    accepteerEenmaligKnop.dataset.lastId = lastId;
+    accepteerEenmaligKnop.dataset.periodeId = periodeId || '';
+    accepteerEenmaligKnop.style.display = '';
   } else {
     accepteerKnop.style.display = 'none';
+    accepteerEenmaligKnop.style.display = 'none';
   }
 
   document.getElementById('match-detail-naam').textContent = o.naam;
@@ -672,6 +679,16 @@ async function accepteerAfwijkingBedrag() {
     body: JSON.stringify({ bedrag: nieuwBedrag, vanaf_datum: periode.start_datum })
   });
   await api(`/api/periodes/${huidigePeriodeId}/hermatchen`, { method: 'POST' });
+  laadDashboard();
+}
+
+async function accepteerAfwijkingEenmalig() {
+  const knop = document.getElementById('btn-accepteer-bedrag-eenmalig');
+  const lastId = parseInt(knop.dataset.lastId);
+  const periodeId = parseInt(knop.dataset.periodeId) || huidigePeriodeId;
+  if (!periodeId) return;
+  sluitModal('modal-match-detail');
+  await api(`/api/periodes/${periodeId}/accepteer-afwijking-eenmalig/${lastId}`, { method: 'POST' });
   laadDashboard();
 }
 
