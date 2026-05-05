@@ -10,7 +10,6 @@ let allLasten = [];
 let allPeriodes = [];
 let huidigePeriodeId = null;
 let bewerkJaar = null;
-let dashboardJaarVerwijderd = [];
 let importPreviewData = [];
 let allLastenSelectOptions = '';
 let ongekoppeldeTransacties = [];
@@ -116,7 +115,7 @@ async function laadLasten() {
 function renderLasten() {
   const tbody = document.getElementById('lasten-body');
   if (!allLasten.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">Nog geen vaste lasten. Voeg er een toe.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Nog geen vaste lasten. Voeg er een toe.</td></tr>';
     return;
   }
   tbody.innerHTML = allLasten.map(l => `
@@ -125,9 +124,6 @@ function renderLasten() {
       <td>${euro(l.bedrag)}</td>
       <td>${esc(l.categorie || '—')}</td>
       <td>${l.verwachte_dag ? l.verwachte_dag + 'e' : '—'}</td>
-      <td>
-        <button class="toggle ${l.actief ? 'on' : ''}" onclick="toggleActief(${l.id}, ${l.actief})" title="${l.actief ? 'Actief' : 'Inactief'}"></button>
-      </td>
       <td style="text-align:right">
         <button class="btn btn-sm btn-secondary" onclick="openModalLast(${l.id})">Bewerken</button>
         <button class="btn btn-sm btn-danger" onclick="verwijderLast(${l.id})">Verwijderen</button>
@@ -215,61 +211,14 @@ async function submitLast(e) {
   }
   sluitModal('modal-last');
   await laadLasten();
-  if (huidigePeriodeId) laadDashboard(); else { renderInactieveLasten(); }
-}
-
-async function toggleActief(id, huidig) {
-  if (huidig) await deactiveerLast(id); else await activeerLast(id);
-}
-
-// Globale deactivering (vanuit lasten-tab toggle)
-async function deactiveerLast(id) {
-  const l = allLasten.find(x => x.id === id);
-  if (!l) return;
-  await api(`/api/lasten/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...l, actief: 0 }) });
-  await laadLasten();
-  if (huidigePeriodeId) laadDashboard(); else renderInactieveLasten();
-}
-
-// Globale activering (vanuit inactieve lasten sectie of lasten-tab)
-async function activeerLast(id) {
-  const l = allLasten.find(x => x.id === id);
-  if (!l) return;
-  await api(`/api/lasten/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...l, actief: 1 }) });
-  await laadLasten();
-  if (huidigePeriodeId) laadDashboard(); else renderInactieveLasten();
-}
-
-// Per-periode deactivering (vanuit dashboard kebab)
-async function deactiveerLastInPeriode(id) {
-  if (!huidigePeriodeId) return;
-  await api(`/api/periodes/${huidigePeriodeId}/deactiveer-last/${id}`, { method: 'POST' });
-  laadDashboard();
-}
-
-// Per-periode activering (vanuit dashboard kebab, voor periode-inactieve last)
-async function activeerLastVoorJaar(lastId) {
-  const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
-  if (!periode) return;
-  const jaar = new Date(periode.start_datum).getFullYear();
-  await api(`/api/lasten/${lastId}/jaar/${jaar}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ actief: 1, vanaf_datum: '0000-00-00' })
-  });
-  laadDashboard();
-}
-
-async function activeerLastInPeriode(id) {
-  if (!huidigePeriodeId) return;
-  await api(`/api/periodes/${huidigePeriodeId}/activeer-last/${id}`, { method: 'POST' });
-  laadDashboard();
+  if (huidigePeriodeId) laadDashboard();
 }
 
 async function verwijderLast(id) {
   if (!confirm('Vaste last verwijderen?')) return;
   await api(`/api/lasten/${id}`, { method: 'DELETE' });
   await laadLasten();
-  if (huidigePeriodeId) laadDashboard(); else renderInactieveLasten();
+  if (huidigePeriodeId) laadDashboard();
 }
 
 // ============================================================
@@ -450,7 +399,6 @@ function renderDashboardTabel() {
 
   if (!dashboardOverzicht.length) {
     document.getElementById('dashboard-card').innerHTML = '<div class="empty">Geen actieve vaste lasten. Gebruik + Toevoegen om ze toe te voegen.</div>';
-    renderInactieveLasten();
     return;
   }
 
@@ -478,30 +426,23 @@ function renderDashboardTabel() {
     const kanMarkeren = o.status !== 'betaald' && o.status !== 'inactief';
     const menuItems = [];
 
-    if (o.status === 'inactief') {
-      menuItems.push(`<button onclick="${ctx}activeerLastInPeriode(${o.id});sluitActiesMenu()">Activeren in deze periode</button>`);
+    if (kanMarkeren) {
+      menuItems.push(`<button onclick="${ctx}markeerBetaald(${o.id});sluitActiesMenu()">✓ Markeer als betaald</button>`);
       menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
-    } else {
-      if (kanMarkeren) {
-        menuItems.push(`<button onclick="${ctx}markeerBetaald(${o.id});sluitActiesMenu()">✓ Markeer als betaald</button>`);
-        menuItems.push(`<div class="menu-divider"></div>`);
-        menuItems.push(`<button onclick="${ctx}openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">Zoek transactie</button>`);
-        menuItems.push(`<button onclick="${ctx}hermatchenLast(${o.id});sluitActiesMenu()">↺ Hermatchen</button>`);
-      }
-      if (o.status === 'betaald' && o.handmatig_betaald) {
-        menuItems.push(`<button class="danger" onclick="${ctx}ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
-      }
-      if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
-        const periodeArg = isAlleMode ? `,${o.periode_id}` : '';
-        menuItems.push(`<button onclick="${ctx}toonMatchDetail(${o.id}${periodeArg});sluitActiesMenu()">Bekijk match</button>`);
-      }
-      menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
-      menuItems.push(`<button onclick="${ctx}deactiveerLastInPeriode(${o.id});sluitActiesMenu()">Deactiveren</button>`);
+      menuItems.push(`<button onclick="${ctx}openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">Zoek transactie</button>`);
+      menuItems.push(`<button onclick="${ctx}hermatchenLast(${o.id});sluitActiesMenu()">↺ Hermatchen</button>`);
     }
+    if (o.status === 'betaald' && o.handmatig_betaald) {
+      menuItems.push(`<button class="danger" onclick="${ctx}ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
+    }
+    if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
+      const periodeArg = isAlleMode ? `,${o.periode_id}` : '';
+      menuItems.push(`<button onclick="${ctx}toonMatchDetail(${o.id}${periodeArg});sluitActiesMenu()">Bekijk match</button>`);
+    }
+    menuItems.push(`<div class="menu-divider"></div>`);
+    menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
 
-    menuItems.push(`<button class="danger" onclick="${ctx}verwijderLastInJaar(${o.id});sluitActiesMenu()">Verwijderen in dit jaar</button>`);
+    menuItems.push(`<button class="danger" onclick="${ctx}verwijderLast(${o.id});sluitActiesMenu()">Verwijderen</button>`);
 
     const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
     const acties = `
@@ -536,56 +477,11 @@ function renderDashboardTabel() {
       <thead><tr>${headers}</tr></thead>
       <tbody>${rijen || geenResultaat}</tbody>
     </table>`;
-
-  renderInactieveLasten();
-  renderJaarVerwijderd();
-}
-
-function renderJaarVerwijderd() {
-  const sectie = document.getElementById('jaar-verwijderd-sectie');
-  if (!huidigePeriodeId || !dashboardJaarVerwijderd.length) { sectie.style.display = 'none'; return; }
-  sectie.style.display = 'block';
-  document.getElementById('jaar-verwijderd-body').innerHTML = dashboardJaarVerwijderd.map(l => `
-    <tr style="opacity:.6">
-      <td><strong>${esc(l.naam)}</strong></td>
-      <td>${euro(l.bedrag)}</td>
-      <td>${esc(l.categorie || '—')}</td>
-      <td style="text-align:right;white-space:nowrap">
-        <button class="btn btn-sm btn-secondary" onclick="activeerLastVoorJaar(${l.id})">Activeer voor dit jaar</button>
-      </td>
-    </tr>
-  `).join('');
-}
-
-async function verwijderLastInJaar(id) {
-  if (!huidigePeriodeId) return;
-  const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
-  if (!periode) return;
-  const jaar = new Date(periode.start_datum).getFullYear();
-  if (!confirm(`Vaste last verwijderen uit ${jaar}?`)) return;
-  await api(`/api/lasten/${id}/jaar/${jaar}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actief: 0 }) });
-  laadDashboard();
 }
 
 
-function renderInactieveLasten() {
-  const sectie = document.getElementById('inactieve-lasten-sectie');
-  const inactief = allLasten.filter(l => !l.actief);
-  if (!inactief.length) { sectie.style.display = 'none'; return; }
-  sectie.style.display = 'block';
-  document.getElementById('inactieve-lasten-body').innerHTML = inactief.map(l => `
-    <tr style="opacity:.55">
-      <td><strong>${esc(l.naam)}</strong></td>
-      <td>${euro(l.bedrag)}</td>
-      <td>${esc(l.categorie || '—')}</td>
-      <td style="text-align:right;white-space:nowrap">
-        <button class="btn btn-sm btn-secondary" onclick="activeerLast(${l.id})">Activeren</button>
-        <button class="btn btn-sm btn-secondary" onclick="openModalLast(${l.id})">Bewerken</button>
-        <button class="btn btn-sm btn-danger" onclick="verwijderLast(${l.id})">Verwijderen</button>
-      </td>
-    </tr>
-  `).join('');
-}
+
+
 
 async function laadDashboard() {
   const sel = document.getElementById('periode-select');
@@ -598,7 +494,6 @@ async function laadDashboard() {
     document.getElementById('totalen').style.display = 'none';
     document.getElementById('dashboard-acties').style.display = 'none';
     document.getElementById('dashboard-grafieken').style.display = 'none';
-    document.getElementById('inactieve-lasten-sectie').style.display = 'none';
     return;
   }
 
@@ -618,7 +513,6 @@ async function laadDashboard() {
   document.getElementById('dashboard-grafieken').style.display = 'block';
 
   dashboardOverzicht = data.overzicht;
-  dashboardJaarVerwijderd = data.jaarVerwijderd || [];
   vulCategorieFilter();
   renderDashboardTabel();
 
