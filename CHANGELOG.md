@@ -8,13 +8,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 ## [1.3.0] - 2026-05-05
 
 ### Changed
-- Bedrag is niet meer verplicht bij het invoeren van een vaste last wanneer "Variabel bedrag" is aangevinkt
-- Transacties die tot 20 dagen voor een periode-start vallen worden bij import alsnog aan die periode toegewezen (lost matching-probleem op voor afschrijvingen vlak voor de periodestart)
-- "Verwijderen" verwijdert een vaste last permanent (geen deactiveren/reactiveren meer)
+- Amount field is no longer required when adding a recurring expense with "Variable amount" checked
+- Deleting a recurring expense is now permanent — replaces the old deactivate/reactivate flow
+- Transaction matching now works across period boundaries: transactions up to 20 days before a period start are matched to that period (fixes matching failures for payments on the last day before a new period)
+- Hermatchen (re-match) and manual transaction search now include transactions from adjacent periods within 20 days of the period boundary
+- Coupling a transaction from another period automatically moves it to the target period
+- Renamed `migrate_vanaf_datum.sql` to `migrate_from_date.sql`
+
+### Fixed
+- Duplicate period labels in the period dropdown (e.g. two entries for the same date range)
+- Period deletion via settings now works correctly (previously the delete button did nothing for duplicate periods)
 
 ### Removed
-- Mogelijkheid om vaste lasten te deactiveren en opnieuw te activeren
-- "Niet actief in dit jaar" sectie op het dashboard
+- Ability to deactivate and reactivate recurring expenses
+- "Not active this year" section on the dashboard
+- Unused variables and dead code (`allLastenSelectOptions`, `MAANDEN`, `updateLastenSelect()`)
 
 ---
 
