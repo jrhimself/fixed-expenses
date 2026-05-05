@@ -22,14 +22,16 @@ const MAANDEN_KORT = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt
 
 function periodeNaam(p) {
   if (!p || !p.start_datum) return '—';
-  const [, sm, sd] = p.start_datum.split('-');
-  const startMaand = parseInt(sm) - 1;
-  const startDag = parseInt(sd);
-  if (p.eind_datum) {
-    const [, em, ed] = p.eind_datum.split('-');
-    return `${startDag} ${MAANDEN_KORT[startMaand]} – ${parseInt(ed)} ${MAANDEN_KORT[parseInt(em) - 1]}`;
-  }
-  return `${startDag} ${MAANDEN_KORT[startMaand]} – ${MAANDEN_KORT[(startMaand + 1) % 12]}`;
+  const startMaand = parseInt(p.start_datum.split('-')[1]) - 1;
+  const eindMaand = p.eind_datum ? parseInt(p.eind_datum.split('-')[1]) - 1 : (startMaand + 1) % 12;
+  return MAANDEN_KORT[startMaand] + '-' + MAANDEN_KORT[eindMaand];
+}
+
+function periodeNaamUniek(p, lijst) {
+  const naam = periodeNaam(p);
+  const dubbel = lijst.filter(x => periodeNaam(x) === naam);
+  if (dubbel.length <= 1) return naam;
+  return naam + ' (' + p.start_datum.slice(8, 10) + '-' + p.start_datum.slice(5, 7) + ')';
 }
 
 // Hulp
@@ -275,8 +277,19 @@ async function verwijderLast(id) {
 // ============================================================
 async function laadPeriodes() {
   allPeriodes = await api('/api/periodes');
+  await verwijderDuplicaatPeriodes();
   renderPeriodes();
   vulPeriodeSelect();
+}
+
+async function verwijderDuplicaatPeriodes() {
+  const namen = allPeriodes.map(p => p.start_datum + '|' + p.eind_datum);
+  const heeftDubbel = namen.some((n, i) => namen.indexOf(n) !== i);
+  if (!heeftDubbel) return;
+  const res = await api('/api/periodes/verwijder-duplicaten', { method: 'POST' });
+  if (res.verwijderd > 0) {
+    allPeriodes = await api('/api/periodes');
+  }
 }
 
 function renderPeriodes() {
@@ -314,7 +327,7 @@ function vulPeriodeSelect() {
   const huidigPeriode = periSel.value;
   periSel.innerHTML = (gefilterd.length ? '' : '<option value="">— geen periodes —</option>') +
     (gefilterd.length ? '<option value="alle">Alle periodes</option>' : '') +
-    gefilterd.map(p => `<option value="${p.id}">${periodeNaam(p)}</option>`).join('');
+    gefilterd.map(p => `<option value="${p.id}">${periodeNaamUniek(p, gefilterd)}</option>`).join('');
   // Behoud huidige selectie als die nog in de gefilterde lijst zit
   if (huidigPeriode && (huidigPeriode === 'alle' || gefilterd.find(p => p.id == huidigPeriode))) {
     periSel.value = huidigPeriode;
@@ -327,7 +340,7 @@ function filterPeriodesByJaar(skipDashboard = false) {
   const gefilterd = allPeriodes.filter(p => p.start_datum.startsWith(jaarSel.value));
   periSel.innerHTML = (gefilterd.length ? '' : '<option value="">— geen periodes —</option>') +
     (gefilterd.length ? '<option value="alle">Alle periodes</option>' : '') +
-    gefilterd.map(p => `<option value="${p.id}">${periodeNaam(p)}</option>`).join('');
+    gefilterd.map(p => `<option value="${p.id}">${periodeNaamUniek(p, gefilterd)}</option>`).join('');
   if (!skipDashboard) laadDashboard();
 }
 
