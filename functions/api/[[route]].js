@@ -836,6 +836,22 @@ async function handlePeriodes(path, method, request, env) {
     return Response.json({ ok: true });
   }
 
+  // POST /periodes/verwijder-duplicaten — verwijder periodes met identieke start/eind die geen transacties hebben
+  if (path === '/periodes/verwijder-duplicaten' && method === 'POST') {
+    const { results: dubbel } = await env.DB.prepare(`
+      SELECT p.id FROM periodes p
+      WHERE EXISTS (
+        SELECT 1 FROM periodes p2
+        WHERE p2.start_datum = p.start_datum AND p2.eind_datum = p.eind_datum AND p2.id < p.id
+      )
+      AND NOT EXISTS (SELECT 1 FROM bank_transacties WHERE periode_id = p.id)
+    `).all();
+    if (dubbel.length === 0) return Response.json({ verwijderd: 0 });
+    const ids = dubbel.map(d => d.id);
+    await env.DB.prepare(`DELETE FROM periodes WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).run();
+    return Response.json({ verwijderd: ids.length });
+  }
+
   return null;
 }
 
