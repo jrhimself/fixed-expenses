@@ -22,9 +22,14 @@ const MAANDEN_KORT = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt
 
 function periodeNaam(p) {
   if (!p || !p.start_datum) return '—';
-  const startMaand = parseInt(p.start_datum.split('-')[1]) - 1;
-  const eindMaand = p.eind_datum ? parseInt(p.eind_datum.split('-')[1]) - 1 : (startMaand + 1) % 12;
-  return MAANDEN_KORT[startMaand] + '-' + MAANDEN_KORT[eindMaand];
+  const [, sm, sd] = p.start_datum.split('-');
+  const startMaand = parseInt(sm) - 1;
+  const startDag = parseInt(sd);
+  if (p.eind_datum) {
+    const [, em, ed] = p.eind_datum.split('-');
+    return `${startDag} ${MAANDEN_KORT[startMaand]} – ${parseInt(ed)} ${MAANDEN_KORT[parseInt(em) - 1]}`;
+  }
+  return `${startDag} ${MAANDEN_KORT[startMaand]} – ${MAANDEN_KORT[(startMaand + 1) % 12]}`;
 }
 
 // Hulp
