@@ -1,6 +1,6 @@
 // Versie
 (function() {
-  const base = 'v1.2.8';
+  const base = 'v1.3.0';
   const versie = window.location.hostname.endsWith('.pages.dev') ? base + '-preview' : base;
   document.getElementById('app-versie').textContent = versie;
 })();
@@ -224,7 +224,10 @@ async function verwijderLast(id) {
 // ============================================================
 async function laadPeriodes() {
   allPeriodes = await api('/api/periodes');
-  await verwijderDuplicaatPeriodes();
+  if (!window._duplicaatCheckDone) {
+    await verwijderDuplicaatPeriodes();
+    window._duplicaatCheckDone = true;
+  }
   renderPeriodes();
   vulPeriodeSelect();
 }
@@ -280,7 +283,7 @@ function vulPeriodeSelect() {
     (gefilterd.length ? '<option value="alle">Alle periodes</option>' : '') +
     gefilterd.map(p => `<option value="${p.id}">${periodeNaamUniek(p, gefilterd)}</option>`).join('');
   // Behoud huidige selectie als die nog in de gefilterde lijst zit
-  if (huidigPeriode && (huidigPeriode === 'alle' || gefilterd.find(p => p.id == huidigPeriode))) {
+  if (huidigPeriode && (huidigPeriode === 'alle' || gefilterd.find(p => String(p.id) === huidigPeriode))) {
     periSel.value = huidigPeriode;
   }
 }
@@ -1069,7 +1072,7 @@ async function verwijderPeriodeVanuitInstellingen(id) {
   if (!confirm('Periode en alle bijbehorende transacties verwijderen?')) return;
   try {
     await api(`/api/periodes/${id}`, { method: 'DELETE' });
-    if (huidigePeriodeId == id) huidigePeriodeId = null;
+    if (huidigePeriodeId === id) huidigePeriodeId = null;
     await laadPeriodes();
     renderInstPeriodes();
     laadDashboard();

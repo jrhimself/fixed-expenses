@@ -195,21 +195,23 @@ async function handleLasten(path, method, request, env) {
 function applyJaarOverridesOpLasten(lasten, jaarOverrides, periodeDatum = '9999-99-99') {
   if (!jaarOverrides.length) return lasten;
 
-  // Find the most recent applicable override for a last (vanaf_datum <= periodeDatum)
-  function getBestOverride(lastId) {
-    const applicable = jaarOverrides
-      .filter(o => o.last_id === lastId && o.vanaf_datum <= periodeDatum)
-      .sort((a, b) => b.vanaf_datum.localeCompare(a.vanaf_datum));
-    return applicable[0] || null;
+  // Pre-build a Map of best override per last_id for O(1) lookup
+  const overrideMap = new Map();
+  for (const o of jaarOverrides) {
+    if (o.vanaf_datum > periodeDatum) continue;
+    const existing = overrideMap.get(o.last_id);
+    if (!existing || o.vanaf_datum > existing.vanaf_datum) {
+      overrideMap.set(o.last_id, o);
+    }
   }
 
   return lasten
     .filter(l => {
-      const o = getBestOverride(l.id);
+      const o = overrideMap.get(l.id);
       return !o || o.actief !== 0;
     })
     .map(l => {
-      const o = getBestOverride(l.id);
+      const o = overrideMap.get(l.id);
       if (!o) return l;
       const merged = { ...l };
       if (o.naam != null) merged.naam = o.naam;
@@ -368,6 +370,38 @@ async function handlePeriodes(path, method, request, env) {
       env.DB.prepare('SELECT * FROM vaste_last_jaar_overrides WHERE jaar=?').bind(parseInt(jaar)).all(),
     ]);
 
+    if (!periodes.length) return Response.json({ overzicht: [], totaalVerwacht: 0, totaalBetaald: 0 });
+
+    // Bulk-fetch all data for the year's periods in single queries
+    const periodeIds = periodes.map(p => p.id);
+    const placeholders = periodeIds.map(() => '?').join(',');
+    const [
+      { results: alleTransacties },
+      { results: alleOvergeslagen },
+      { results: allePeriodeActief },
+    ] = await Promise.all([
+      env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id IN (${placeholders}) ORDER BY datum`).bind(...periodeIds).all(),
+      env.DB.prepare(`SELECT periode_id, last_id FROM periode_overgeslagen WHERE periode_id IN (${placeholders})`).bind(...periodeIds).all(),
+      env.DB.prepare(`SELECT periode_id, last_id, actief FROM vaste_last_periode_actief WHERE periode_id IN (${placeholders})`).bind(...periodeIds).all(),
+    ]);
+
+    // Group by periode_id for O(1) lookup
+    const transactiesByPeriode = new Map();
+    const overgeslagenByPeriode = new Map();
+    const actiefByPeriode = new Map();
+    for (const t of alleTransacties) {
+      if (!transactiesByPeriode.has(t.periode_id)) transactiesByPeriode.set(t.periode_id, []);
+      transactiesByPeriode.get(t.periode_id).push(t);
+    }
+    for (const o of alleOvergeslagen) {
+      if (!overgeslagenByPeriode.has(o.periode_id)) overgeslagenByPeriode.set(o.periode_id, []);
+      overgeslagenByPeriode.get(o.periode_id).push(o);
+    }
+    for (const a of allePeriodeActief) {
+      if (!actiefByPeriode.has(a.periode_id)) actiefByPeriode.set(a.periode_id, []);
+      actiefByPeriode.get(a.periode_id).push(a);
+    }
+
     const overzicht = [];
     let totaalVerwacht = 0, totaalBetaald = 0;
 
@@ -375,15 +409,9 @@ async function handlePeriodes(path, method, request, env) {
       // Apply overrides period-aware: only overrides with vanaf_datum <= periode.start_datum
       const effectieveLasten = applyJaarOverridesOpLasten(lasten, jaarOverrides, periode.start_datum);
 
-      const [
-        { results: transacties },
-        { results: overgeslagenRijen },
-        { results: alleOverrides },
-      ] = await Promise.all([
-        env.DB.prepare('SELECT * FROM bank_transacties WHERE periode_id=? ORDER BY datum').bind(periode.id).all(),
-        env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(periode.id).all(),
-        env.DB.prepare('SELECT last_id, actief FROM vaste_last_periode_actief WHERE periode_id=?').bind(periode.id).all(),
-      ]);
+      const transacties = transactiesByPeriode.get(periode.id) || [];
+      const overgeslagenRijen = overgeslagenByPeriode.get(periode.id) || [];
+      const alleOverrides = actiefByPeriode.get(periode.id) || [];
 
       const overgeslagenIds = new Set(overgeslagenRijen.map(r => r.last_id));
       const vandaag = new Date().toISOString().slice(0, 10);
@@ -800,7 +828,7 @@ async function handlePeriodes(path, method, request, env) {
         WHERE periode_id=? AND gekoppeld_last_id=? AND handmatig_gekoppeld=1 AND (tegenrekening IS NULL OR tegenrekening='')
       `).bind(p.id, m.last_id));
       // Ontkoppel echte banktransacties in opvolgende periodes (niet de huidige), ongeacht hoe gekoppeld
-      if (p.id != m.id) {
+      if (p.id !== m.id) {
         statements.push(env.DB.prepare(`
           UPDATE bank_transacties SET gekoppeld_last_id=NULL, handmatig_gekoppeld=0
           WHERE periode_id=? AND gekoppeld_last_id=?
