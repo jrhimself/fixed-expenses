@@ -11,12 +11,10 @@ let allPeriodes = [];
 let huidigePeriodeId = null;
 let bewerkJaar = null;
 let importPreviewData = [];
-let allLastenSelectOptions = '';
 let ongekoppeldeTransacties = [];
 let dashboardOverzicht = [];
 let appInstellingen = {};
 
-const MAANDEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
 const MAANDEN_KORT = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
 
 function periodeNaam(p) {
@@ -109,7 +107,6 @@ function sluitModal(id) { document.getElementById(id).classList.remove('open'); 
 async function laadLasten() {
   allLasten = await api('/api/lasten');
   renderLasten();
-  updateLastenSelect();
 }
 
 function renderLasten() {
@@ -130,11 +127,6 @@ function renderLasten() {
       </td>
     </tr>
   `).join('');
-}
-
-function updateLastenSelect() {
-  allLastenSelectOptions = '<option value="">— ontkoppelen —</option>' +
-    allLasten.map(l => `<option value="${l.id}">${esc(l.naam)} (${euro(l.bedrag)})</option>`).join('');
 }
 
 function openModalLast(id, vanuitDashboard = false) {
