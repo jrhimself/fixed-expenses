@@ -5,6 +5,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.2.8] - 2026-04-25
+
+### Changed
+- Bedrag is niet meer verplicht bij het invoeren van een vaste last wanneer "Variabel bedrag" is aangevinkt
+- Transacties die tot 20 dagen voor een periode-start vallen worden bij import alsnog aan die periode toegewezen (lost matching-probleem op voor afschrijvingen vlak voor de periodestart)
+- "Verwijderen" verwijdert een vaste last permanent (geen deactiveren/reactiveren meer)
+
+### Removed
+- Mogelijkheid om vaste lasten te deactiveren en opnieuw te activeren
+- "Niet actief in dit jaar" sectie op het dashboard
+
+---
+
 ## [1.2.7] - 2026-03-24
 
 ### Changed
