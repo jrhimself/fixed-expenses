@@ -1175,11 +1175,16 @@ function renderInstPeriodes() {
 
 async function verwijderPeriodeVanuitInstellingen(id) {
   if (!confirm('Periode en alle bijbehorende transacties verwijderen?')) return;
-  await api(`/api/periodes/${id}`, { method: 'DELETE' });
-  if (huidigePeriodeId === id) huidigePeriodeId = null;
-  await laadPeriodes();
-  renderInstPeriodes();
-  laadDashboard();
+  try {
+    await api(`/api/periodes/${id}`, { method: 'DELETE' });
+    if (huidigePeriodeId == id) huidigePeriodeId = null;
+    await laadPeriodes();
+    renderInstPeriodes();
+    laadDashboard();
+    toonToast('Periode verwijderd.', 'ok');
+  } catch (e) {
+    toonToast('Verwijderen mislukt: ' + e.message, 'fout');
+  }
 }
 
 async function slaInstellingenOp() {
