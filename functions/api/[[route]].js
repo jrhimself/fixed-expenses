@@ -991,14 +991,24 @@ async function handleStatistieken(path, method, env) {
       .sort((a, b) => b[1] - a[1])
       .map(([naam, bedrag]) => ({ naam, bedrag: Math.round(bedrag * 100) / 100 }));
 
+    const MAANDEN_KORT = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
     const periodeData = periodes.map(p => {
       const verwacht = lasten.reduce((s, l) => {
         const override = getActiefOverride(l.id, p.start_datum);
         if (override && override.actief === 0) return s;
         return s + l.bedrag;
       }, 0);
+      const [, sm] = p.start_datum.split('-');
+      const startMaand = parseInt(sm) - 1;
+      let label;
+      if (p.eind_datum) {
+        const [, em] = p.eind_datum.split('-');
+        label = `${MAANDEN_KORT[startMaand]}-${MAANDEN_KORT[parseInt(em) - 1]}`;
+      } else {
+        label = `${MAANDEN_KORT[startMaand]}-${MAANDEN_KORT[(startMaand + 1) % 12]}`;
+      }
       return {
-        label: p.start_datum.slice(0, 7),
+        label,
         verwacht: Math.round(verwacht * 100) / 100,
         betaald: Math.round((betaaldMap[p.id] || 0) * 100) / 100,
         overgeslagen: overgeslagenMap[p.id] || 0,
