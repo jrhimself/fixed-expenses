@@ -1,16 +1,21 @@
 # Vaste Lasten Tracker
 
-Een persoonlijke financiële web-app om vaste lasten bij te houden, bankafschriften te importeren en je budget per salarisperiode te beheren.
+A personal finance web app to track recurring costs, import bank statements, and manage your budget per salary period.
 
 ## Features
 
-- **Dashboard** — Overzicht van je vaste lasten per periode met status (betaald, open, overgeslagen)
-- **Afwijkingsmarkering** — Rijen worden geel gemarkeerd als het afgeschreven bedrag afwijkt van het verwachte bedrag
-- **Bankimport** — CSV-import van ING, ABN AMRO en Rabobank met automatische herkenning
-- **Automatische matching** — Transacties worden gekoppeld aan vaste lasten op basis van IBAN, omschrijving of bedrag (alleen afschrijvingen)
-- **Periodes** — Budgetperiodes op basis van je salarisdag, automatisch genereerbaar per jaar
-- **Categorieën** — Groepeer je vaste lasten en bekijk de verdeling in grafieken
-- **Statistieken** — Taartdiagram per categorie en staafdiagram per periode
+- **Dashboard** — Overview of recurring costs per period with status (paid, open, skipped)
+- **Deviation marking** — Rows are highlighted yellow when the debited amount deviates from the expected amount
+- **Variable costs** — Mark costs as variable to skip deviation highlighting; amount becomes optional
+- **Bank import** — CSV import from ING, ABN AMRO and Rabobank with automatic format detection
+- **Auto-matching** — Transactions are matched to recurring costs based on IBAN, description pattern, name, or amount (debits only)
+- **Boundary matching** — Transactions up to 20 days outside a period can still be matched to that period
+- **Periods** — Budget periods based on your salary day, auto-generated per year
+- **Year overview** — Aggregated view across all periods in a year
+- **Year overrides** — Per-year customization of cost name, amount, category, and expected day
+- **Categories** — Group recurring costs and view the distribution in charts
+- **Charts** — Pie chart by category and bar chart by period
+- **Permanent delete** — Fully remove a recurring cost (no deactivation/reactivation)
 
 ## Tech Stack
 
@@ -24,38 +29,39 @@ Een persoonlijke financiële web-app om vaste lasten bij te houden, bankafschrif
 | Tests | Vitest |
 | Linting | ESLint v9 |
 
-## Projectstructuur
+## Project structure
 
 ```
 ├── functions/api/[[route]].js   # API handler (serverless)
 ├── lib/
-│   ├── automatch.js             # Match-logica (geëxporteerd voor tests)
-│   └── csv.js                  # CSV parsing (geëxporteerd voor tests)
+│   ├── automatch.js             # Match logic (exported for tests)
+│   └── csv.js                   # CSV parsing (exported for tests)
 ├── public/
 │   ├── index.html               # Single-page app
-│   ├── app.js                   # Frontend logica
+│   ├── app.js                   # Frontend logic
 │   ├── style.css                # Styling
 │   └── chart.min.js             # Chart.js library
 ├── test/
-│   ├── automatch.test.js        # Unit tests voor match-logica
-│   └── csv.test.js              # Unit tests voor CSV parsing
+│   ├── automatch.test.js        # Unit tests for match logic
+│   └── csv.test.js              # Unit tests for CSV parsing
 ├── schema.sql                   # Database schema
-├── wrangler.toml                # Cloudflare configuratie
-├── eslint.config.js             # ESLint configuratie
-├── CHANGELOG.md                 # Versiehistorie
+├── migrate_from_date.sql        # Migration: add vanaf_datum column
+├── wrangler.toml                # Cloudflare configuration
+├── eslint.config.js             # ESLint configuration
+├── CHANGELOG.md                 # Version history
 └── .github/
     ├── workflows/deploy.yml     # CI/CD pipeline (lint → test → deploy)
     └── pull_request_template.md # PR template
 ```
 
-## Lokaal ontwikkelen
+## Local development
 
 ```bash
 npm install
 npx wrangler pages dev public/ --d1 DB=vaste-lasten-db
 ```
 
-Dit start een lokale dev-server met een lokale D1-database. Bij de eerste keer moet je het schema toepassen:
+This starts a local dev server with a local D1 database. On first run, apply the schema:
 
 ```bash
 npx wrangler d1 execute vaste-lasten-db --local --file=schema.sql
@@ -67,60 +73,68 @@ npx wrangler d1 execute vaste-lasten-db --local --file=schema.sql
 npm test
 ```
 
-Draait 37 unit tests met Vitest voor de match-logica en CSV parsing.
+Runs unit tests with Vitest for match logic and CSV parsing.
 
 ## Deployment
 
-De app wordt automatisch gedeployd naar Cloudflare Pages bij een push naar elke branch. De GitHub Actions workflow:
+The app is automatically deployed to Cloudflare Pages on every push. The GitHub Actions workflow:
 
-1. **lint** en **test** — Draaien parallel: ESLint check + 37 unit tests
-2. **deploy** — Deployt via `wrangler-action@v3` naar Cloudflare Pages (alleen als lint én test slagen)
+1. **lint** and **test** — Run in parallel: ESLint check + unit tests
+2. **deploy** — Deploys via `wrangler-action@v3` to Cloudflare Pages (only if lint and test pass)
 
-Feature branches krijgen een preview URL (`https://feature-vX-Y-Z.vaste-lasten.pages.dev`). Mergen naar `main` vereist een PR en een geslaagde `test` check.
+Feature branches get a preview URL (`https://feature-vX-Y-Z.vaste-lasten.pages.dev`). Merging to `main` requires a PR and a passing `test` check.
 
-**Vereiste GitHub Secrets:**
+**Required GitHub Secrets:**
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
 ## Versioning
 
-Semantische versienummering (semver). Feature branches worden aangemaakt als `feature/vX.Y.Z`. Alle wijzigingen worden bijgehouden in [`CHANGELOG.md`](CHANGELOG.md).
+Semantic versioning (semver). Feature branches are created as `feature/vX.Y.Z`. All changes are tracked in [`CHANGELOG.md`](CHANGELOG.md).
 
 - **PATCH** (1.0.x) — Bug fixes
-- **MINOR** (1.x.0) — Nieuwe features
+- **MINOR** (1.x.0) — New features
 - **MAJOR** (x.0.0) — Breaking changes
 
-De huidige versie is zichtbaar onderaan het sidebar-menu in de app.
+The current version is displayed at the bottom of the sidebar menu in the app.
 
 ## API Endpoints
 
-| Methode | Pad | Beschrijving |
-|---------|-----|-------------|
-| `GET` | `/api/lasten` | Alle vaste lasten ophalen |
-| `POST` | `/api/lasten` | Nieuwe vaste last aanmaken |
-| `PUT` | `/api/lasten/:id` | Vaste last bewerken |
-| `DELETE` | `/api/lasten/:id` | Vaste last verwijderen |
-| `GET` | `/api/periodes` | Alle periodes ophalen |
-| `POST` | `/api/periodes` | Nieuwe periode aanmaken |
-| `POST` | `/api/periodes/genereer/:jaar` | Periodes genereren voor een jaar |
-| `GET` | `/api/periodes/:id/overzicht` | Periode-overzicht met koppelingen |
-| `POST` | `/api/import/preview` | CSV-bestand previewed |
-| `POST` | `/api/import/opslaan` | Geïmporteerde transacties opslaan |
-| `GET` | `/api/statistieken` | Grafiekdata ophalen |
-| `GET` | `/api/transacties` | Transacties zoeken |
-| `GET/PUT` | `/api/instellingen` | Instellingen beheren |
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/lasten` | Get all recurring costs |
+| `POST` | `/api/lasten` | Create a recurring cost |
+| `PUT` | `/api/lasten/:id` | Update a recurring cost |
+| `DELETE` | `/api/lasten/:id` | Permanently delete a recurring cost |
+| `GET` | `/api/periodes` | Get all periods |
+| `POST` | `/api/periodes` | Create a new period |
+| `POST` | `/api/periodes/genereer/:jaar` | Generate periods for a year |
+| `GET` | `/api/periodes/jaar/:jaar/overzicht` | Year overview with all periods |
+| `GET` | `/api/periodes/:id/overzicht` | Period overview with linked transactions |
+| `POST` | `/api/periodes/:id/hermatchen` | Re-match all transactions in a period |
+| `POST` | `/api/periodes/:id/hermatchen/:last_id` | Re-match a specific cost in a period |
+| `POST` | `/api/periodes/:id/koppel/:last_id` | Manually link a transaction to a cost |
+| `GET` | `/api/periodes/:id/alle-ongekoppeld` | Get unlinked transactions (incl. boundary) |
+| `POST` | `/api/periodes/verwijder-duplicaten` | Remove duplicate periods |
+| `POST` | `/api/import/preview` | Preview a CSV file |
+| `POST` | `/api/import/opslaan` | Save imported transactions |
+| `GET` | `/api/statistieken` | Get chart data |
+| `GET` | `/api/transacties` | Search transactions |
+| `GET/PUT` | `/api/instellingen` | Manage settings |
+| `GET/POST/PUT/DELETE` | `/api/jaar-overrides` | Manage per-year cost overrides |
 
 ## Database
 
-Zes tabellen in Cloudflare D1 (SQLite):
+Seven tables in Cloudflare D1 (SQLite):
 
-- **vaste_lasten** — Vaste lasten met naam, bedrag, categorie, IBAN en omschrijvingspatroon
-- **periodes** — Salarisperiodes met start/einddatum en salarisbedrag
-- **bank_transacties** — Geïmporteerde banktransacties met koppeling aan last en periode
-- **periode_overgeslagen** — Overgeslagen lasten per periode
-- **vaste_last_periode_actief** — Per-periode activering van lasten
-- **instellingen** — Key-value instellingen (o.a. salarisdag)
+- **vaste_lasten** — Recurring costs with name, amount, category, IBAN, description pattern, and variable flag
+- **periodes** — Budget periods with start/end date and salary amount
+- **bank_transacties** — Imported bank transactions linked to a cost and period
+- **periode_overgeslagen** — Skipped costs per period
+- **vaste_last_periode_actief** — Per-period activation of costs
+- **vaste_last_jaar_overrides** — Per-year customization of cost properties (amount, name, category, etc.)
+- **instellingen** — Key-value settings (e.g. salary day)
 
-## Licentie
+## License
 
 Private project.
