@@ -538,9 +538,14 @@ async function handlePeriodes(path, method, request, env) {
 
   // GET /periodes/:id/alle-ongekoppeld
   if ((m = matchPath('/periodes/:id/alle-ongekoppeld', path)) && method === 'GET') {
+    const periode = await env.DB.prepare('SELECT * FROM periodes WHERE id=?').bind(m.id).first();
+    // Haal ook ongekoppelde transacties op die max 20 dagen voor de periode-start vallen
+    const grens = new Date(periode.start_datum);
+    grens.setDate(grens.getDate() - 20);
+    const grensStr = grens.toISOString().slice(0, 10);
     const { results } = await env.DB.prepare(
-      'SELECT * FROM bank_transacties WHERE periode_id=? AND gekoppeld_last_id IS NULL ORDER BY datum'
-    ).bind(m.id).all();
+      'SELECT * FROM bank_transacties WHERE (periode_id=? OR (datum >= ? AND datum < ? AND gekoppeld_last_id IS NULL)) AND gekoppeld_last_id IS NULL ORDER BY datum'
+    ).bind(m.id, grensStr, periode.start_datum).all();
     return Response.json(results);
   }
 
@@ -643,8 +648,8 @@ async function handlePeriodes(path, method, request, env) {
 
     const lastId = lastResult.meta.last_row_id;
     await env.DB.prepare(`
-      UPDATE bank_transacties SET gekoppeld_last_id=?, handmatig_gekoppeld=1 WHERE id=? AND periode_id=?
-    `).bind(lastId, transactie_id, m.id).run();
+      UPDATE bank_transacties SET gekoppeld_last_id=?, handmatig_gekoppeld=1, periode_id=? WHERE id=?
+    `).bind(lastId, m.id, transactie_id).run();
 
     return Response.json({ last_id: lastId });
   }
@@ -667,8 +672,13 @@ async function handlePeriodes(path, method, request, env) {
 
     for (const p of volgendePeriodes) {
       const effectieveLastenPeriode = applyJaarOverridesOpLasten(lasten, jaarOverrides, p.start_datum);
-      const [{ results: transacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
+      // Ook transacties uit vorige periode ophalen die dicht bij de start vallen (max 20 dagen)
+      const grens = new Date(p.start_datum);
+      grens.setDate(grens.getDate() - 20);
+      const grensStr = grens.toISOString().slice(0, 10);
+      const [{ results: transacties }, { results: randTransacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
         env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id=? OR gekoppeld_last_id IS NULL)`).bind(p.id, lastId).all(),
+        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0 AND gekoppeld_last_id IS NULL`).bind(p.id, grensStr, p.start_datum).all(),
         env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(p.id).all(),
         env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(p.id).all(),
       ]);
@@ -679,6 +689,14 @@ async function handlePeriodes(path, method, request, env) {
         if (t.gekoppeld_last_id === lastId || matchId === lastId) {
           alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(matchId ?? null, t.id));
           if (matchId === lastId) gematcht++;
+        }
+      }
+      // Rand-transacties uit vorige periode: als ze matchen, verplaats naar deze periode
+      for (const t of randTransacties) {
+        const matchId = autoMatch(t, matchbare, p);
+        if (matchId === lastId) {
+          alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=?, periode_id=? WHERE id=?').bind(matchId, p.id, t.id));
+          gematcht++;
         }
       }
     }
@@ -704,8 +722,13 @@ async function handlePeriodes(path, method, request, env) {
 
     for (const p of volgendePeriodes) {
       const effectieveLastenPeriode = applyJaarOverridesOpLasten(lasten, jaarOverrides, p.start_datum);
-      const [{ results: transacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
+      // Ook transacties uit vorige periode ophalen die dicht bij de start vallen (max 20 dagen)
+      const grens = new Date(p.start_datum);
+      grens.setDate(grens.getDate() - 20);
+      const grensStr = grens.toISOString().slice(0, 10);
+      const [{ results: transacties }, { results: randTransacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
         env.DB.prepare('SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0').bind(p.id).all(),
+        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0 AND gekoppeld_last_id IS NULL`).bind(p.id, grensStr, p.start_datum).all(),
         env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(p.id).all(),
         env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(p.id).all(),
       ]);
@@ -716,6 +739,15 @@ async function handlePeriodes(path, method, request, env) {
         if (lastId) gematcht++;
         alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(lastId ?? null, t.id));
         hermatcht++;
+      }
+      // Rand-transacties uit vorige periode: als ze matchen, verplaats naar deze periode
+      for (const t of randTransacties) {
+        const lastId = autoMatch(t, matchbare, p);
+        if (lastId) {
+          alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=?, periode_id=? WHERE id=?').bind(lastId, p.id, t.id));
+          gematcht++;
+          hermatcht++;
+        }
       }
     }
 
@@ -793,12 +825,13 @@ async function handlePeriodes(path, method, request, env) {
     const { transactie_id, last_id } = await request.json();
     if (last_id === null || last_id === undefined) {
       await env.DB.prepare(`
-        UPDATE bank_transacties SET gekoppeld_last_id=NULL, handmatig_gekoppeld=0 WHERE id=? AND periode_id=?
-      `).bind(transactie_id, m.id).run();
+        UPDATE bank_transacties SET gekoppeld_last_id=NULL, handmatig_gekoppeld=0 WHERE id=?
+      `).bind(transactie_id).run();
     } else {
+      // Verplaats transactie naar deze periode als hij er nog niet in zit
       await env.DB.prepare(`
-        UPDATE bank_transacties SET gekoppeld_last_id=?, handmatig_gekoppeld=1 WHERE id=? AND periode_id=?
-      `).bind(last_id, transactie_id, m.id).run();
+        UPDATE bank_transacties SET gekoppeld_last_id=?, handmatig_gekoppeld=1, periode_id=? WHERE id=?
+      `).bind(last_id, m.id, transactie_id).run();
     }
     return Response.json({ ok: true });
   }
