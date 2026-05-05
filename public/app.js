@@ -175,15 +175,21 @@ function openModalLast(id, vanuitDashboard = false) {
 async function submitLast(e) {
   e.preventDefault();
   const id = document.getElementById('last-id').value;
+  const variabel = document.getElementById('last-variabel').checked ? 1 : 0;
+  const bedragVal = parseFloat(document.getElementById('last-bedrag').value);
+  if (!variabel && (!bedragVal || bedragVal <= 0)) {
+    alert('Bedrag is verplicht als het geen variabel bedrag is.');
+    return;
+  }
   const body = {
     naam: document.getElementById('last-naam').value,
-    bedrag: parseFloat(document.getElementById('last-bedrag').value),
+    bedrag: bedragVal || 0,
     verwachte_dag: parseInt(document.getElementById('last-dag').value) || null,
     categorie: document.getElementById('last-categorie').value,
     iban_tegenrekening: document.getElementById('last-iban').value,
     omschrijving_patroon: document.getElementById('last-patroon').value,
     afwijking_drempel: parseFloat(document.getElementById('last-afwijking').value) || null,
-    variabel: document.getElementById('last-variabel').checked ? 1 : 0,
+    variabel,
     actief: 1
   };
   if (id && bewerkJaar) {

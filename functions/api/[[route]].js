@@ -950,9 +950,19 @@ async function handleImport(path, method, request, env) {
     const inserts = [];
 
     for (const t of transacties) {
-      const periode = allePeriodes.find(p =>
+      // Periode toewijzing: probeer eerst exacte match, anders kijk tot 20 dagen voor de start
+      let periode = allePeriodes.find(p =>
         t.datum >= p.start_datum && (!p.eind_datum || t.datum <= p.eind_datum)
       );
+      if (!periode) {
+        // Zoek een periode waarvan de start maximaal 20 dagen na de transactiedatum valt
+        const tDate = new Date(t.datum);
+        periode = allePeriodes.find(p => {
+          const start = new Date(p.start_datum);
+          const diffDagen = (start - tDate) / (1000 * 60 * 60 * 24);
+          return diffDagen > 0 && diffDagen <= 20;
+        });
+      }
       if (!periode) { aantalGeenPeriode++; continue; }
 
       if (t.tegenrekening && genegeerdIbansPerPeriode.get(periode.id).has(t.tegenrekening)) { aantalOvergeslagen++; continue; }
