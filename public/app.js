@@ -283,12 +283,16 @@ async function laadPeriodes() {
 }
 
 async function verwijderDuplicaatPeriodes() {
-  const namen = allPeriodes.map(p => p.start_datum + '|' + p.eind_datum);
-  const heeftDubbel = namen.some((n, i) => namen.indexOf(n) !== i);
-  if (!heeftDubbel) return;
-  const res = await api('/api/periodes/verwijder-duplicaten', { method: 'POST' });
-  if (res.verwijderd > 0) {
-    allPeriodes = await api('/api/periodes');
+  try {
+    const namen = allPeriodes.map(p => p.start_datum + '|' + p.eind_datum);
+    const heeftDubbel = namen.some((n, i) => namen.indexOf(n) !== i);
+    if (!heeftDubbel) return;
+    const res = await api('/api/periodes/verwijder-duplicaten', { method: 'POST' });
+    if (res.verwijderd > 0) {
+      allPeriodes = await api('/api/periodes');
+    }
+  } catch (e) {
+    console.warn('Duplicaat-cleanup overgeslagen:', e.message);
   }
 }
 
@@ -1290,7 +1294,11 @@ async function init() {
   const authenticated = await checkAuth();
   if (authenticated) {
     document.getElementById('app-layout').style.display = '';
-    await startApp();
+    try {
+      await startApp();
+    } catch (e) {
+      console.error('App laden mislukt:', e);
+    }
   } else {
     document.getElementById('login-screen').style.display = '';
     document.getElementById('app-layout').style.display = 'none';
