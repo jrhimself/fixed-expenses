@@ -66,9 +66,10 @@ describe('autoMatch — bedrag + verwachte dag', () => {
     expect(autoMatch(t, lasten, periode)).toBe(3);
   });
 
-  it('does not match when date is more than 5 days off', () => {
+  it('still matches unique bedrag even when date is more than 5 days off', () => {
     const t = { bedrag: -85.00, tegenrekening: '', omschrijving: '', datum: '2024-02-10' };
-    expect(autoMatch(t, lasten, periode)).toBeNull();
+    // Uniek bedrag → altijd match, verwachte_dag is indicatie, geen harde eis
+    expect(autoMatch(t, lasten, periode)).toBe(3);
   });
 
   it('does not match when amount differs by more than €0.02', () => {
