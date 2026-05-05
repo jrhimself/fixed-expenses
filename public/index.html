@@ -28,6 +28,30 @@
   <aside class="sidebar">
     <div class="sidebar-title">Vaste Lasten</div>
 
+    <div class="sidebar-illustration">
+      <svg xmlns="http://www.w3.org/2000/svg" width="110" height="110" viewBox="0 0 110 110" fill="none">
+        <!-- Huis -->
+        <polygon points="55,14 18,44 18,92 92,92 92,44" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.5)" stroke-width="2.5" stroke-linejoin="round"/>
+        <!-- Dak punt -->
+        <polyline points="12,48 55,12 98,48" stroke="rgba(255,255,255,0.6)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <!-- Deur -->
+        <rect x="43" y="66" width="24" height="26" rx="3" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.45)" stroke-width="2"/>
+        <!-- Deurknop -->
+        <circle cx="62" cy="80" r="2" fill="rgba(255,255,255,0.6)"/>
+        <!-- Raam links -->
+        <rect x="24" y="56" width="16" height="14" rx="2" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.4)" stroke-width="1.8"/>
+        <line x1="32" y1="56" x2="32" y2="70" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+        <line x1="24" y1="63" x2="40" y2="63" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+        <!-- Raam rechts -->
+        <rect x="70" y="56" width="16" height="14" rx="2" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.4)" stroke-width="1.8"/>
+        <line x1="78" y1="56" x2="78" y2="70" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+        <line x1="70" y1="63" x2="86" y2="63" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+        <!-- Euro-munt -->
+        <circle cx="80" cy="30" r="13" fill="#1a1a2e" stroke="rgba(255,220,80,0.85)" stroke-width="2.2"/>
+        <text x="80" y="35" text-anchor="middle" font-size="14" font-family="Georgia, serif" fill="rgba(255,220,80,0.9)">€</text>
+      </svg>
+    </div>
+
     <nav class="sidebar-nav">
       <button class="active" onclick="toonPagina('dashboard', this)">Dashboard</button>
     </nav>
@@ -40,7 +64,7 @@
       </nav>
     </div>
 
-    <div class="sidebar-version">v1.2.7</div>
+    <div class="sidebar-version" id="app-versie"></div>
   </aside>
 
   <!-- CONTENT -->
@@ -54,6 +78,14 @@
           <select id="periode-select" onchange="laadDashboard()" style="width:auto;min-width:190px"></select>
           <select id="categorie-filter" onchange="filterDashboard()" style="width:auto;min-width:150px">
             <option value="">Alle categorieën</option>
+          </select>
+          <select id="status-filter" onchange="filterDashboard()" style="width:auto;min-width:140px">
+            <option value="">Alle statussen</option>
+            <option value="open">Open</option>
+            <option value="verwacht">Verwacht</option>
+            <option value="betaald">Betaald</option>
+            <option value="overgeslagen">Overgeslagen</option>
+            <option value="inactief">Inactief</option>
           </select>
           <input type="text" id="dashboard-zoek" placeholder="Zoek op naam of bedrag…" oninput="filterDashboard()" style="flex:1;min-width:180px">
         </div>
@@ -74,14 +106,19 @@
         </div>
       </div>
 
-      <div class="grafieken-grid" id="dashboard-grafieken" style="display:none;margin-bottom:16px">
-        <div class="card">
-          <h3 class="chart-titel">Verdeling per categorie</h3>
-          <div class="chart-wrap"><canvas id="chart-categorie"></canvas></div>
-        </div>
-        <div class="card">
-          <h3 class="chart-titel">Verwacht vs betaald per periode</h3>
-          <div class="chart-wrap"><canvas id="chart-periodes"></canvas></div>
+      <div class="grafieken-sectie" id="dashboard-grafieken" style="display:none">
+        <button class="grafieken-toggle" onclick="toggleGrafieken(this)">
+          <span id="grafieken-pijl">▼</span> Grafieken
+        </button>
+        <div class="grafieken-grid" id="grafieken-inhoud">
+          <div class="card">
+            <h3 class="chart-titel">Verdeling per categorie</h3>
+            <div class="chart-wrap"><canvas id="chart-categorie"></canvas></div>
+          </div>
+          <div class="card">
+            <h3 class="chart-titel">Verwacht vs betaald per periode</h3>
+            <div class="chart-wrap"><canvas id="chart-periodes"></canvas></div>
+          </div>
         </div>
       </div>
 
@@ -93,15 +130,11 @@
         <div class="empty">Selecteer of maak een periode aan om te beginnen.</div>
       </div>
 
-      <div id="inactieve-lasten-sectie" style="display:none;margin-top:16px">
-        <h3 style="font-size:14px;font-weight:600;color:#6b7280;margin-bottom:12px">Inactieve vaste lasten</h3>
-        <div class="card">
-          <table>
-            <thead><tr><th>Naam</th><th>Bedrag</th><th>Categorie</th><th></th></tr></thead>
-            <tbody id="inactieve-lasten-body"></tbody>
-          </table>
-        </div>
-      </div>
+
+
+
+
+
 
     </div>
 
@@ -148,7 +181,6 @@
               <th>Bedrag</th>
               <th>Categorie</th>
               <th>Dag</th>
-              <th>Actief</th>
               <th></th>
             </tr>
           </thead>
@@ -196,8 +228,8 @@
           <input type="text" id="last-naam" required>
         </div>
         <div>
-          <label>Bedrag (€) *</label>
-          <input type="number" id="last-bedrag" step="0.01" min="0" placeholder="0.00" required>
+          <label>Bedrag (€)</label>
+          <input type="number" id="last-bedrag" step="0.01" min="0" placeholder="0.00">
         </div>
         <div>
           <label>Verwachte dag (1-31)</label>
@@ -214,6 +246,14 @@
         <div class="full">
           <label>Omschrijving patroon (tekst of regex)</label>
           <input type="text" id="last-patroon" placeholder="bijv. Netflix of ^SEPA.*ziggo">
+        </div>
+        <div>
+          <label>Toegestane afwijking bedrag (€)</label>
+          <input type="number" id="last-afwijking" step="0.01" min="0" placeholder="bijv. 5">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:20px">
+          <input type="checkbox" id="last-variabel" style="width:auto;margin:0">
+          <label for="last-variabel" style="margin:0;font-weight:400">Variabel bedrag (nooit geel markeren)</label>
         </div>
       </div>
       <div class="form-actions">
@@ -402,7 +442,9 @@
   <div class="modal" style="width:480px">
     <h3>Match detail — <span id="match-detail-naam" style="font-weight:400;color:#6b7280"></span></h3>
     <div id="match-detail-inhoud"></div>
-    <div class="form-actions">
+    <div class="form-actions" style="flex-wrap:wrap;gap:8px">
+      <button type="button" class="btn btn-secondary" id="btn-accepteer-bedrag" style="display:none" onclick="accepteerAfwijkingBedrag()">Accepteer als nieuw bedrag</button>
+      <button type="button" class="btn btn-secondary" id="btn-accepteer-bedrag-eenmalig" style="display:none" onclick="accepteerAfwijkingEenmalig()">Accepteer eenmalig</button>
       <button type="button" class="btn btn-danger" id="btn-match-ongedaan" onclick="matchOngedaanVanuitDetail()">Match ongedaan maken</button>
       <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-match-detail')">Sluiten</button>
     </div>

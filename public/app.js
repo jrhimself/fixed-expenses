@@ -1,14 +1,20 @@
+// Versie
+(function() {
+  const base = 'v1.3.0';
+  const versie = window.location.hostname.endsWith('.pages.dev') ? base + '-preview' : base;
+  document.getElementById('app-versie').textContent = versie;
+})();
+
 // State
 let allLasten = [];
 let allPeriodes = [];
 let huidigePeriodeId = null;
+let bewerkJaar = null;
 let importPreviewData = [];
-let allLastenSelectOptions = '';
 let ongekoppeldeTransacties = [];
 let dashboardOverzicht = [];
 let appInstellingen = {};
 
-const MAANDEN = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
 const MAANDEN_KORT = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
 
 function periodeNaam(p) {
@@ -16,6 +22,13 @@ function periodeNaam(p) {
   const startMaand = parseInt(p.start_datum.split('-')[1]) - 1;
   const eindMaand = p.eind_datum ? parseInt(p.eind_datum.split('-')[1]) - 1 : (startMaand + 1) % 12;
   return MAANDEN_KORT[startMaand] + '-' + MAANDEN_KORT[eindMaand];
+}
+
+function periodeNaamUniek(p, lijst) {
+  const naam = periodeNaam(p);
+  const dubbel = lijst.filter(x => periodeNaam(x) === naam);
+  if (dubbel.length <= 1) return naam;
+  return naam + ' (' + p.start_datum.slice(8, 10) + '-' + p.start_datum.slice(5, 7) + ')';
 }
 
 // Hulp
@@ -94,13 +107,12 @@ function sluitModal(id) { document.getElementById(id).classList.remove('open'); 
 async function laadLasten() {
   allLasten = await api('/api/lasten');
   renderLasten();
-  updateLastenSelect();
 }
 
 function renderLasten() {
   const tbody = document.getElementById('lasten-body');
   if (!allLasten.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">Nog geen vaste lasten. Voeg er een toe.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Nog geen vaste lasten. Voeg er een toe.</td></tr>';
     return;
   }
   tbody.innerHTML = allLasten.map(l => `
@@ -109,9 +121,6 @@ function renderLasten() {
       <td>${euro(l.bedrag)}</td>
       <td>${esc(l.categorie || '—')}</td>
       <td>${l.verwachte_dag ? l.verwachte_dag + 'e' : '—'}</td>
-      <td>
-        <button class="toggle ${l.actief ? 'on' : ''}" onclick="toggleActief(${l.id}, ${l.actief})" title="${l.actief ? 'Actief' : 'Inactief'}"></button>
-      </td>
       <td style="text-align:right">
         <button class="btn btn-sm btn-secondary" onclick="openModalLast(${l.id})">Bewerken</button>
         <button class="btn btn-sm btn-danger" onclick="verwijderLast(${l.id})">Verwijderen</button>
@@ -120,20 +129,28 @@ function renderLasten() {
   `).join('');
 }
 
-function updateLastenSelect() {
-  allLastenSelectOptions = '<option value="">— ontkoppelen —</option>' +
-    allLasten.map(l => `<option value="${l.id}">${esc(l.naam)} (${euro(l.bedrag)})</option>`).join('');
-}
-
-function openModalLast(id) {
+function openModalLast(id, vanuitDashboard = false) {
+  bewerkJaar = null;
   document.getElementById('last-id').value = '';
   document.getElementById('form-last').reset();
   document.getElementById('modal-last-titel').textContent = 'Vaste last toevoegen';
 
   if (id) {
-    const l = allLasten.find(x => x.id === id);
+    // Bepaal databron: dashboard (jaar-overrides al gemergd) of globale lijst
+    const vanDashboard = vanuitDashboard && huidigePeriodeId;
+    const l = vanDashboard
+      ? (dashboardOverzicht.find(x => x.id === id && x.periode_id === huidigePeriodeId)
+         || dashboardOverzicht.find(x => x.id === id))
+      : allLasten.find(x => x.id === id);
     if (!l) return;
-    document.getElementById('modal-last-titel').textContent = 'Vaste last bewerken';
+
+    if (vanDashboard) {
+      const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+      bewerkJaar = periode ? new Date(periode.start_datum).getFullYear() : null;
+    }
+
+    const titelSuffix = bewerkJaar ? ` (${bewerkJaar})` : '';
+    document.getElementById('modal-last-titel').textContent = 'Vaste last bewerken' + titelSuffix;
     document.getElementById('last-id').value = l.id;
     document.getElementById('last-naam').value = l.naam;
     document.getElementById('last-bedrag').value = (l.bedrag || 0).toFixed(2);
@@ -141,6 +158,8 @@ function openModalLast(id) {
     document.getElementById('last-categorie').value = l.categorie || '';
     document.getElementById('last-iban').value = l.iban_tegenrekening || '';
     document.getElementById('last-patroon').value = l.omschrijving_patroon || '';
+    document.getElementById('last-afwijking').value = l.afwijking_drempel != null ? l.afwijking_drempel : '';
+    document.getElementById('last-variabel').checked = !!l.variabel;
   }
   openModal('modal-last');
 }
@@ -148,66 +167,56 @@ function openModalLast(id) {
 async function submitLast(e) {
   e.preventDefault();
   const id = document.getElementById('last-id').value;
+  const variabel = document.getElementById('last-variabel').checked ? 1 : 0;
+  const bedragVal = parseFloat(document.getElementById('last-bedrag').value);
+  if (!variabel && (!bedragVal || bedragVal <= 0)) {
+    alert('Bedrag is verplicht als het geen variabel bedrag is.');
+    return;
+  }
   const body = {
     naam: document.getElementById('last-naam').value,
-    bedrag: parseFloat(document.getElementById('last-bedrag').value),
+    bedrag: bedragVal || 0,
     verwachte_dag: parseInt(document.getElementById('last-dag').value) || null,
     categorie: document.getElementById('last-categorie').value,
     iban_tegenrekening: document.getElementById('last-iban').value,
     omschrijving_patroon: document.getElementById('last-patroon').value,
+    afwijking_drempel: parseFloat(document.getElementById('last-afwijking').value) || null,
+    variabel,
     actief: 1
   };
-  if (id) {
+  if (id && bewerkJaar) {
+    const huidigePeriode = allPeriodes.find(p => p.id === huidigePeriodeId);
+    body.vanaf_datum = huidigePeriode ? huidigePeriode.start_datum : '0000-00-00';
+    await api(`/api/lasten/${id}/jaar/${bewerkJaar}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (huidigePeriodeId) await api(`/api/periodes/${huidigePeriodeId}/hermatchen`, { method: 'POST' });
+  } else if (id) {
     await api(`/api/lasten/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   } else {
-    await api('/api/lasten', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await api('/api/lasten', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    // Hide in all previous periods of this year so it only propagates forward
+    if (huidigePeriodeId && res.id) {
+      await api(`/api/lasten/${res.id}/activeer-vanaf-periode/${huidigePeriodeId}`, { method: 'POST' });
+      // Prevent automatic propagation to next year
+      const huidigePeriode = allPeriodes.find(p => p.id === huidigePeriodeId);
+      if (huidigePeriode) {
+        const volgendJaar = new Date(huidigePeriode.start_datum).getFullYear() + 1;
+        await api(`/api/lasten/${res.id}/jaar/${volgendJaar}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actief: 0, vanaf_datum: '0000-00-00' })
+        });
+      }
+    }
   }
   sluitModal('modal-last');
   await laadLasten();
-  if (huidigePeriodeId) laadDashboard(); else { renderInactieveLasten(); }
-}
-
-async function toggleActief(id, huidig) {
-  if (huidig) await deactiveerLast(id); else await activeerLast(id);
-}
-
-// Globale deactivering (vanuit lasten-tab toggle)
-async function deactiveerLast(id) {
-  const l = allLasten.find(x => x.id === id);
-  if (!l) return;
-  await api(`/api/lasten/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...l, actief: 0 }) });
-  await laadLasten();
-  if (huidigePeriodeId) laadDashboard(); else renderInactieveLasten();
-}
-
-// Globale activering (vanuit inactieve lasten sectie of lasten-tab)
-async function activeerLast(id) {
-  const l = allLasten.find(x => x.id === id);
-  if (!l) return;
-  await api(`/api/lasten/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...l, actief: 1 }) });
-  await laadLasten();
-  if (huidigePeriodeId) laadDashboard(); else renderInactieveLasten();
-}
-
-// Per-periode deactivering (vanuit dashboard kebab)
-async function deactiveerLastInPeriode(id) {
-  if (!huidigePeriodeId) return;
-  await api(`/api/periodes/${huidigePeriodeId}/deactiveer-last/${id}`, { method: 'POST' });
-  laadDashboard();
-}
-
-// Per-periode activering (vanuit dashboard kebab, voor periode-inactieve last)
-async function activeerLastInPeriode(id) {
-  if (!huidigePeriodeId) return;
-  await api(`/api/periodes/${huidigePeriodeId}/activeer-last/${id}`, { method: 'POST' });
-  laadDashboard();
+  if (huidigePeriodeId) laadDashboard();
 }
 
 async function verwijderLast(id) {
   if (!confirm('Vaste last verwijderen?')) return;
   await api(`/api/lasten/${id}`, { method: 'DELETE' });
   await laadLasten();
-  if (huidigePeriodeId) laadDashboard(); else renderInactieveLasten();
+  if (huidigePeriodeId) laadDashboard();
 }
 
 // ============================================================
@@ -215,8 +224,26 @@ async function verwijderLast(id) {
 // ============================================================
 async function laadPeriodes() {
   allPeriodes = await api('/api/periodes');
+  if (!window._duplicaatCheckDone) {
+    await verwijderDuplicaatPeriodes();
+    window._duplicaatCheckDone = true;
+  }
   renderPeriodes();
   vulPeriodeSelect();
+}
+
+async function verwijderDuplicaatPeriodes() {
+  try {
+    const namen = allPeriodes.map(p => p.start_datum + '|' + p.eind_datum);
+    const heeftDubbel = namen.some((n, i) => namen.indexOf(n) !== i);
+    if (!heeftDubbel) return;
+    const res = await api('/api/periodes/verwijder-duplicaten', { method: 'POST' });
+    if (res.verwijderd > 0) {
+      allPeriodes = await api('/api/periodes');
+    }
+  } catch (e) {
+    console.warn('Duplicaat-cleanup overgeslagen:', e.message);
+  }
 }
 
 function renderPeriodes() {
@@ -253,9 +280,10 @@ function vulPeriodeSelect() {
   const gefilterd = allPeriodes.filter(p => p.start_datum.startsWith(huidigJaar));
   const huidigPeriode = periSel.value;
   periSel.innerHTML = (gefilterd.length ? '' : '<option value="">— geen periodes —</option>') +
-    gefilterd.map(p => `<option value="${p.id}">${periodeNaam(p)}</option>`).join('');
+    (gefilterd.length ? '<option value="alle">Alle periodes</option>' : '') +
+    gefilterd.map(p => `<option value="${p.id}">${periodeNaamUniek(p, gefilterd)}</option>`).join('');
   // Behoud huidige selectie als die nog in de gefilterde lijst zit
-  if (huidigPeriode && gefilterd.find(p => p.id == huidigPeriode)) {
+  if (huidigPeriode && (huidigPeriode === 'alle' || gefilterd.find(p => String(p.id) === huidigPeriode))) {
     periSel.value = huidigPeriode;
   }
 }
@@ -265,7 +293,8 @@ function filterPeriodesByJaar(skipDashboard = false) {
   const periSel = document.getElementById('periode-select');
   const gefilterd = allPeriodes.filter(p => p.start_datum.startsWith(jaarSel.value));
   periSel.innerHTML = (gefilterd.length ? '' : '<option value="">— geen periodes —</option>') +
-    gefilterd.map(p => `<option value="${p.id}">${periodeNaam(p)}</option>`).join('');
+    (gefilterd.length ? '<option value="alle">Alle periodes</option>' : '') +
+    gefilterd.map(p => `<option value="${p.id}">${periodeNaamUniek(p, gefilterd)}</option>`).join('');
   if (!skipDashboard) laadDashboard();
 }
 
@@ -335,10 +364,11 @@ async function verwijderPeriode(id) {
 // ============================================================
 // DASHBOARD
 // ============================================================
-let dashboardFilter = { categorie: '', zoekterm: '' };
+let dashboardFilter = { categorie: '', status: '', zoekterm: '' };
 
 function filterDashboard() {
   dashboardFilter.categorie = document.getElementById('categorie-filter').value;
+  dashboardFilter.status = document.getElementById('status-filter').value;
   dashboardFilter.zoekterm = document.getElementById('dashboard-zoek').value.toLowerCase().trim();
   renderDashboardTabel();
 }
@@ -352,16 +382,31 @@ function vulCategorieFilter() {
   if (cats.includes(huidigCat)) sel.value = huidigCat;
 }
 
+// Tijdelijk periode instellen vanuit "alle periodes" modus voor periode-specifieke acties
+function setAlleModePeriode(periodeId) {
+  huidigePeriodeId = periodeId;
+}
+
+function toggleGrafieken(btn) {
+  const inhoud = document.getElementById('grafieken-inhoud');
+  const pijl = document.getElementById('grafieken-pijl');
+  const ingeklapt = inhoud.style.display === 'none';
+  inhoud.style.display = ingeklapt ? '' : 'none';
+  pijl.textContent = ingeklapt ? '▼' : '▶';
+}
+
 function renderDashboardTabel() {
+  const isAlleMode = document.getElementById('periode-select').value === 'alle';
+
   if (!dashboardOverzicht.length) {
     document.getElementById('dashboard-card').innerHTML = '<div class="empty">Geen actieve vaste lasten. Gebruik + Toevoegen om ze toe te voegen.</div>';
-    renderInactieveLasten();
     return;
   }
 
-  const { categorie, zoekterm } = dashboardFilter;
+  const { categorie, status, zoekterm } = dashboardFilter;
   let gefilterd = dashboardOverzicht;
   if (categorie) gefilterd = gefilterd.filter(o => (o.categorie || '') === categorie);
+  if (status) gefilterd = gefilterd.filter(o => o.status === status);
   if (zoekterm) gefilterd = gefilterd.filter(o =>
     o.naam.toLowerCase().includes(zoekterm) ||
     (o.categorie || '').toLowerCase().includes(zoekterm) ||
@@ -370,110 +415,109 @@ function renderDashboardTabel() {
   );
 
   const rijen = gefilterd.map(o => {
+    const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
+    const eenmaligGeaccepteerd = o.betaling?.bedrag_afwijking_geaccepteerd === 1;
+    const bedragAfwijking = !o.variabel && !eenmaligGeaccepteerd && o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
+      Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
+
+    // ctx: set period context first when in alle-modus
+    const ctx = isAlleMode ? `setAlleModePeriode(${o.periode_id});` : '';
+    const periodeLabel = isAlleMode && o.periode_start ? periodeNaam({ start_datum: o.periode_start }) : null;
+
     const kanMarkeren = o.status !== 'betaald' && o.status !== 'inactief';
     const menuItems = [];
 
-    if (o.status === 'inactief') {
-      menuItems.push(`<button onclick="activeerLastInPeriode(${o.id});sluitActiesMenu()">Activeren in deze periode</button>`);
+    if (kanMarkeren) {
+      menuItems.push(`<button onclick="${ctx}markeerBetaald(${o.id});sluitActiesMenu()">✓ Markeer als betaald</button>`);
       menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="openModalLast(${o.id});sluitActiesMenu()">Bewerken</button>`);
-    } else {
-      if (kanMarkeren) {
-        menuItems.push(`<button onclick="markeerBetaald(${o.id});sluitActiesMenu()">✓ Markeer als betaald</button>`);
-        menuItems.push(`<div class="menu-divider"></div>`);
-        menuItems.push(`<button onclick="openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">Zoek transactie</button>`);
-        menuItems.push(`<button onclick="hermatchenLast(${o.id});sluitActiesMenu()">↺ Hermatchen</button>`);
-      }
-      if (o.status === 'betaald' && o.handmatig_betaald) {
-        menuItems.push(`<button class="danger" onclick="ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
-      }
-      if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
-        menuItems.push(`<button onclick="toonMatchDetail(${o.id});sluitActiesMenu()">Bekijk match</button>`);
-      }
-      menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="openModalLast(${o.id});sluitActiesMenu()">Bewerken</button>`);
-      menuItems.push(`<button onclick="deactiveerLastInPeriode(${o.id});sluitActiesMenu()">Deactiveren</button>`);
+      menuItems.push(`<button onclick="${ctx}openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">Zoek transactie</button>`);
+      menuItems.push(`<button onclick="${ctx}hermatchenLast(${o.id});sluitActiesMenu()">↺ Hermatchen</button>`);
     }
+    if (o.status === 'betaald' && o.handmatig_betaald) {
+      menuItems.push(`<button class="danger" onclick="${ctx}ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
+    }
+    if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
+      const periodeArg = isAlleMode ? `,${o.periode_id}` : '';
+      menuItems.push(`<button onclick="${ctx}toonMatchDetail(${o.id}${periodeArg});sluitActiesMenu()">Bekijk match</button>`);
+    }
+    menuItems.push(`<div class="menu-divider"></div>`);
+    menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
 
-    menuItems.push(`<button class="danger" onclick="verwijderLast(${o.id});sluitActiesMenu()">Verwijderen</button>`);
+    menuItems.push(`<button class="danger" onclick="${ctx}verwijderLast(${o.id});sluitActiesMenu()">Verwijderen</button>`);
 
     const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
-    const bedragAfwijking = o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
-      Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > 0.01;
     const acties = `
       <div class="acties-menu">
         <button class="acties-btn" onclick="toggleActiesMenu(this, event)">•••</button>
         <div class="acties-dropdown">${menuItems.join('')}</div>
       </div>`;
+    const vierdeKolom = isAlleMode
+      ? `<td${dimStijl}>${periodeLabel || '—'}</td><td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>`
+      : `<td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>`;
     return `<tr${bedragAfwijking ? ' class="bedrag-afwijking"' : ''}>
       <td${dimStijl}><strong>${esc(o.naam)}</strong></td>
       <td${dimStijl}>${euro(o.bedrag)}</td>
       <td${dimStijl}>${esc(o.categorie || '—')}</td>
-      <td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>
+      ${vierdeKolom}
       <td${dimStijl}><span class="badge ${o.status}">${statusLabel(o.status)}</span></td>
-      <td${dimStijl} style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}` : o.handmatig_betaald ? '<em>handmatig</em>' : '—'}</td>
+      <td${dimStijl} style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}${eenmaligGeaccepteerd ? ' <span title="Bedrag eenmalig geaccepteerd" style="color:#d97706;font-weight:600">~</span>' : ''}` : o.handmatig_betaald ? '<em>handmatig</em>' : '—'}</td>
       <td style="white-space:nowrap">${acties}</td>
     </tr>`;
   }).join('');
 
+  const colspan = isAlleMode ? 8 : 7;
   const geenResultaat = gefilterd.length === 0
-    ? '<tr><td colspan="8" class="empty">Geen resultaten voor deze filter.</td></tr>' : '';
+    ? `<tr><td colspan="${colspan}" class="empty">Geen resultaten voor deze filter.</td></tr>` : '';
+
+  const headers = isAlleMode
+    ? '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Periode</th><th>Dag</th><th>Status</th><th>Afschrijving</th><th>Acties</th>'
+    : '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Dag v/d maand</th><th>Status</th><th>Afschrijving</th><th>Acties</th>';
 
   document.getElementById('dashboard-card').innerHTML = `
     <table>
-      <thead><tr><th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Dag v/d maand</th><th>Status</th><th>Afschrijving</th><th>Acties</th></tr></thead>
+      <thead><tr>${headers}</tr></thead>
       <tbody>${rijen || geenResultaat}</tbody>
     </table>`;
-
-  renderInactieveLasten();
 }
 
-function renderInactieveLasten() {
-  const sectie = document.getElementById('inactieve-lasten-sectie');
-  const inactief = allLasten.filter(l => !l.actief);
-  if (!inactief.length) { sectie.style.display = 'none'; return; }
-  sectie.style.display = 'block';
-  document.getElementById('inactieve-lasten-body').innerHTML = inactief.map(l => `
-    <tr style="opacity:.55">
-      <td><strong>${esc(l.naam)}</strong></td>
-      <td>${euro(l.bedrag)}</td>
-      <td>${esc(l.categorie || '—')}</td>
-      <td style="text-align:right;white-space:nowrap">
-        <button class="btn btn-sm btn-secondary" onclick="activeerLast(${l.id})">Activeren</button>
-        <button class="btn btn-sm btn-secondary" onclick="openModalLast(${l.id})">Bewerken</button>
-        <button class="btn btn-sm btn-danger" onclick="verwijderLast(${l.id})">Verwijderen</button>
-      </td>
-    </tr>
-  `).join('');
-}
+
+
+
 
 async function laadDashboard() {
   const sel = document.getElementById('periode-select');
-  huidigePeriodeId = parseInt(sel.value) || null;
+  const selValue = sel.value;
+  const isAlleMode = selValue === 'alle';
+  huidigePeriodeId = isAlleMode ? null : (parseInt(selValue) || null);
 
-  if (!huidigePeriodeId) {
+  if (!huidigePeriodeId && !isAlleMode) {
     document.getElementById('dashboard-card').innerHTML = '<div class="empty">Selecteer of maak een periode aan om te beginnen.</div>';
     document.getElementById('totalen').style.display = 'none';
     document.getElementById('dashboard-acties').style.display = 'none';
     document.getElementById('dashboard-grafieken').style.display = 'none';
-    document.getElementById('inactieve-lasten-sectie').style.display = 'none';
     return;
   }
 
-  const data = await api(`/api/periodes/${huidigePeriodeId}/overzicht`);
+  let data;
+  if (isAlleMode) {
+    const jaar = document.getElementById('jaar-select').value;
+    data = await api(`/api/periodes/jaar/${jaar}/overzicht`);
+  } else {
+    data = await api(`/api/periodes/${huidigePeriodeId}/overzicht`);
+  }
 
   document.getElementById('tot-verwacht').textContent = euro(data.totaalVerwacht);
   document.getElementById('tot-betaald').textContent = euro(data.totaalBetaald);
   document.getElementById('tot-open').textContent = euro(data.totaalVerwacht - data.totaalBetaald);
   document.getElementById('totalen').style.display = 'grid';
-  document.getElementById('dashboard-acties').style.display = 'flex';
-  document.getElementById('dashboard-grafieken').style.display = 'grid';
+  document.getElementById('dashboard-acties').style.display = isAlleMode ? 'none' : 'flex';
+  document.getElementById('dashboard-grafieken').style.display = 'block';
 
   dashboardOverzicht = data.overzicht;
   vulCategorieFilter();
   renderDashboardTabel();
 
-  ongekoppeldeTransacties = data.transacties;
+  ongekoppeldeTransacties = data.transacties || [];
 
   laadGrafieken();
 }
@@ -514,8 +558,10 @@ async function bulkHermatchen() {
   }
 }
 
-function toonMatchDetail(lastId) {
-  const o = dashboardOverzicht.find(x => x.id === lastId);
+function toonMatchDetail(lastId, periodeId = null) {
+  const o = periodeId
+    ? dashboardOverzicht.find(x => x.id === lastId && x.periode_id === periodeId)
+    : dashboardOverzicht.find(x => x.id === lastId);
   if (!o || !o.betaling) return;
   const t = o.betaling;
 
@@ -547,9 +593,58 @@ function toonMatchDetail(lastId) {
       <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">Transactie-id</td><td style="font-size:12px;color:#9ca3af">#${t.id}</td></tr>
       <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">Gematcht via</td><td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;${regelbadge}">${regel}</span></td></tr>
     </table>`;
+  const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
+  const heeftAfwijking = !o.variabel && Math.abs(Math.abs(t.bedrag) - o.bedrag) > afwijkingDrempel;
+  const accepteerKnop = document.getElementById('btn-accepteer-bedrag');
+  const accepteerEenmaligKnop = document.getElementById('btn-accepteer-bedrag-eenmalig');
+  if (heeftAfwijking) {
+    accepteerKnop.textContent = `Accepteer ${euro(Math.abs(t.bedrag))} als nieuw bedrag`;
+    accepteerKnop.dataset.lastId = lastId;
+    accepteerKnop.dataset.periodeId = periodeId || '';
+    accepteerKnop.style.display = '';
+    accepteerEenmaligKnop.textContent = `Accepteer ${euro(Math.abs(t.bedrag))} eenmalig`;
+    accepteerEenmaligKnop.dataset.lastId = lastId;
+    accepteerEenmaligKnop.dataset.periodeId = periodeId || '';
+    accepteerEenmaligKnop.style.display = '';
+  } else {
+    accepteerKnop.style.display = 'none';
+    accepteerEenmaligKnop.style.display = 'none';
+  }
+
   document.getElementById('match-detail-naam').textContent = o.naam;
   document.getElementById('btn-match-ongedaan').dataset.transactieId = t.id;
   openModal('modal-match-detail');
+}
+
+async function accepteerAfwijkingBedrag() {
+  const lastId = parseInt(document.getElementById('btn-accepteer-bedrag').dataset.lastId);
+  const periodeId = parseInt(document.getElementById('btn-accepteer-bedrag').dataset.periodeId) || null;
+  const o = periodeId
+    ? dashboardOverzicht.find(x => x.id === lastId && x.periode_id === periodeId)
+    : dashboardOverzicht.find(x => x.id === lastId);
+  if (!o || !o.betaling) return;
+  const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+  if (!periode) return;
+  const jaar = new Date(periode.start_datum).getFullYear();
+  const nieuwBedrag = Math.abs(o.betaling.bedrag);
+  sluitModal('modal-match-detail');
+  await api(`/api/lasten/${lastId}/jaar/${jaar}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bedrag: nieuwBedrag, vanaf_datum: periode.start_datum })
+  });
+  await api(`/api/periodes/${huidigePeriodeId}/hermatchen`, { method: 'POST' });
+  laadDashboard();
+}
+
+async function accepteerAfwijkingEenmalig() {
+  const knop = document.getElementById('btn-accepteer-bedrag-eenmalig');
+  const lastId = parseInt(knop.dataset.lastId);
+  const periodeId = parseInt(knop.dataset.periodeId) || huidigePeriodeId;
+  if (!periodeId) return;
+  sluitModal('modal-match-detail');
+  await api(`/api/periodes/${periodeId}/accepteer-afwijking-eenmalig/${lastId}`, { method: 'POST' });
+  laadDashboard();
 }
 
 async function matchOngedaanVanuitDetail() {
@@ -775,11 +870,24 @@ async function biedLeerAan(transactieId, lastId, bronTransacties) {
       `"${last.naam}" heeft nog geen IBAN opgeslagen.\n\nWil je "${transactie.tegenrekening}" opslaan zodat toekomstige imports automatisch matchen?`
     );
     if (bevestig) {
+      // Sla globaal op (fallback voor jaren zonder override)
       await api(`/api/lasten/${lastId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...last, iban_tegenrekening: transactie.tegenrekening })
       });
+      // Sla ook op in jaar-override zodat autoMatch met jaar-overrides ook matcht
+      if (huidigePeriodeId) {
+        const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+        const jaar = periode ? new Date(periode.start_datum).getFullYear() : null;
+        if (jaar) {
+          await api(`/api/lasten/${lastId}/jaar/${jaar}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ iban_tegenrekening: transactie.tegenrekening })
+          });
+        }
+      }
       await laadLasten();
     }
   }
@@ -962,11 +1070,16 @@ function renderInstPeriodes() {
 
 async function verwijderPeriodeVanuitInstellingen(id) {
   if (!confirm('Periode en alle bijbehorende transacties verwijderen?')) return;
-  await api(`/api/periodes/${id}`, { method: 'DELETE' });
-  if (huidigePeriodeId === id) huidigePeriodeId = null;
-  await laadPeriodes();
-  renderInstPeriodes();
-  laadDashboard();
+  try {
+    await api(`/api/periodes/${id}`, { method: 'DELETE' });
+    if (huidigePeriodeId === id) huidigePeriodeId = null;
+    await laadPeriodes();
+    renderInstPeriodes();
+    laadDashboard();
+    toonToast('Periode verwijderd.', 'ok');
+  } catch (e) {
+    toonToast('Verwijderen mislukt: ' + e.message, 'fout');
+  }
 }
 
 async function slaInstellingenOp() {
@@ -1081,7 +1194,11 @@ async function init() {
   const authenticated = await checkAuth();
   if (authenticated) {
     document.getElementById('app-layout').style.display = '';
-    await startApp();
+    try {
+      await startApp();
+    } catch (e) {
+      console.error('App laden mislukt:', e);
+    }
   } else {
     document.getElementById('login-screen').style.display = '';
     document.getElementById('app-layout').style.display = 'none';

@@ -8,7 +8,9 @@ CREATE TABLE IF NOT EXISTS vaste_lasten (
   verwachte_dag INTEGER,
   iban_tegenrekening TEXT DEFAULT '',
   omschrijving_patroon TEXT DEFAULT '',
-  actief INTEGER DEFAULT 1
+  actief INTEGER DEFAULT 1,
+  afwijking_drempel REAL,
+  variabel INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS periodes (
@@ -28,7 +30,8 @@ CREATE TABLE IF NOT EXISTS bank_transacties (
   periode_id INTEGER REFERENCES periodes(id),
   gekoppeld_last_id INTEGER REFERENCES vaste_lasten(id),
   handmatig_gekoppeld INTEGER DEFAULT 0,
-  genegeerd INTEGER DEFAULT 0
+  genegeerd INTEGER DEFAULT 0,
+  bedrag_afwijking_geaccepteerd INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS periode_overgeslagen (
@@ -47,4 +50,20 @@ CREATE TABLE IF NOT EXISTS vaste_last_periode_actief (
 CREATE TABLE IF NOT EXISTS instellingen (
   sleutel TEXT PRIMARY KEY,
   waarde TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS vaste_last_jaar_overrides (
+  last_id INTEGER REFERENCES vaste_lasten(id) ON DELETE CASCADE,
+  jaar INTEGER NOT NULL,
+  vanaf_datum TEXT NOT NULL DEFAULT '0000-00-00',
+  bedrag REAL,
+  naam TEXT,
+  categorie TEXT,
+  verwachte_dag INTEGER,
+  iban_tegenrekening TEXT,
+  omschrijving_patroon TEXT,
+  actief INTEGER,
+  afwijking_drempel REAL,
+  variabel INTEGER,
+  PRIMARY KEY (last_id, jaar, vanaf_datum)
 );
