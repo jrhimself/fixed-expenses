@@ -836,20 +836,47 @@ async function handlePeriodes(path, method, request, env) {
     return Response.json({ ok: true });
   }
 
-  // POST /periodes/verwijder-duplicaten — verwijder periodes met identieke start/eind die geen transacties hebben
+  // POST /periodes/verwijder-duplicaten — verwijder periodes met identieke start/eind
   if (path === '/periodes/verwijder-duplicaten' && method === 'POST') {
-    const { results: dubbel } = await env.DB.prepare(`
-      SELECT p.id FROM periodes p
-      WHERE EXISTS (
-        SELECT 1 FROM periodes p2
-        WHERE p2.start_datum = p.start_datum AND p2.eind_datum = p.eind_datum AND p2.id < p.id
-      )
-      AND NOT EXISTS (SELECT 1 FROM bank_transacties WHERE periode_id = p.id)
+    // Vind alle groepen met dezelfde start_datum + eind_datum
+    const { results: groepen } = await env.DB.prepare(`
+      SELECT start_datum, eind_datum, COUNT(*) as n
+      FROM periodes
+      GROUP BY start_datum, eind_datum
+      HAVING COUNT(*) > 1
     `).all();
-    if (dubbel.length === 0) return Response.json({ verwijderd: 0 });
-    const ids = dubbel.map(d => d.id);
-    await env.DB.prepare(`DELETE FROM periodes WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).run();
-    return Response.json({ verwijderd: ids.length });
+    if (groepen.length === 0) return Response.json({ verwijderd: 0 });
+
+    const teVerwijderen = [];
+    for (const g of groepen) {
+      const { results: dubbel } = await env.DB.prepare(`
+        SELECT p.id, (SELECT COUNT(*) FROM bank_transacties WHERE periode_id = p.id) as tx_count
+        FROM periodes p
+        WHERE p.start_datum = ? AND p.eind_datum = ?
+        ORDER BY tx_count DESC, p.id ASC
+      `).bind(g.start_datum, g.eind_datum).all();
+      // Bewaar de eerste (meeste transacties, of laagste id), verwijder de rest
+      for (let i = 1; i < dubbel.length; i++) {
+        teVerwijderen.push(dubbel[i].id);
+      }
+    }
+    if (teVerwijderen.length === 0) return Response.json({ verwijderd: 0 });
+
+    // Verplaats transacties van te-verwijderen periodes naar de behouden periode
+    for (const g of groepen) {
+      const { results: dubbel } = await env.DB.prepare(`
+        SELECT p.id FROM periodes p
+        WHERE p.start_datum = ? AND p.eind_datum = ?
+        ORDER BY (SELECT COUNT(*) FROM bank_transacties WHERE periode_id = p.id) DESC, p.id ASC
+      `).bind(g.start_datum, g.eind_datum).all();
+      const behoudId = dubbel[0].id;
+      for (let i = 1; i < dubbel.length; i++) {
+        await env.DB.prepare('UPDATE bank_transacties SET periode_id = ? WHERE periode_id = ?').bind(behoudId, dubbel[i].id).run();
+      }
+    }
+
+    await env.DB.prepare(`DELETE FROM periodes WHERE id IN (${teVerwijderen.map(() => '?').join(',')})`).bind(...teVerwijderen).run();
+    return Response.json({ verwijderd: teVerwijderen.length });
   }
 
   return null;
