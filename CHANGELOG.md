@@ -5,7 +5,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
-## [1.2.8] - 2026-04-25
+## [1.3.0] - 2026-05-05
 
 ### Changed
 - Bedrag is niet meer verplicht bij het invoeren van een vaste last wanneer "Variabel bedrag" is aangevinkt
