@@ -2,6 +2,21 @@
 
 A personal finance web app to track recurring costs, import bank statements, and manage your budget per salary period.
 
+## Installation options
+
+There are two ways to run this app:
+
+| | Local | Cloudflare |
+|---|---|---|
+| **Setup** | Install Node.js and Git | Cloudflare account required |
+| **Cost** | Free | Free (within Cloudflare's free tier) |
+| **Access** | Your machine only | Accessible from anywhere |
+| **Data** | Stored locally as a file | Stored in Cloudflare D1 |
+| **Updates** | `git pull && npm start` | Automatic on push to `main` |
+
+- **Local** — Runs on your own computer (Windows or Linux). No account needed. See [Running locally](#running-locally-without-cloudflare).
+- **Cloudflare** — Hosted in the cloud, accessible from any device. See [Deployment](#deployment).
+
 ## Features
 
 - **Dashboard** — Overview of recurring costs per period with status (paid, open, skipped)
