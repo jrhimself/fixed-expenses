@@ -218,7 +218,46 @@ Your data in `vastelasten.db` is preserved.
 
 ---
 
-## Local development (Cloudflare / Wrangler)
+## Cloudflare hosting
+
+Host the app in the cloud so it's accessible from any device. Requires a free [Cloudflare account](https://dash.cloudflare.com/sign-up) and the [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/).
+
+### Setup
+
+**1. Create a D1 database**
+
+```bash
+npx wrangler d1 create vaste-lasten-db
+```
+
+Copy the `database_id` from the output and update `wrangler.toml` if needed.
+
+**2. Apply the schema**
+
+```bash
+npx wrangler d1 execute vaste-lasten-db --remote --file=schema.sql
+```
+
+**3. Deploy**
+
+```bash
+npx wrangler pages deploy public
+```
+
+Or connect the repository to Cloudflare Pages via the dashboard for automatic deploys on every push to `main`.
+
+### Local development (Wrangler)
+
+```bash
+npm install
+npx wrangler pages dev public/ --d1 DB=vaste-lasten-db
+```
+
+On first run, apply the schema locally:
+
+```bash
+npx wrangler d1 execute vaste-lasten-db --local --file=schema.sql
+```
 
 ```bash
 npm install
