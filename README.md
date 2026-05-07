@@ -2,6 +2,21 @@
 
 A personal finance web app to track recurring costs, import bank statements, and manage your budget per salary period.
 
+## Installation options
+
+There are two ways to run this app:
+
+| | Local | Cloudflare |
+|---|---|---|
+| **Setup** | Install Node.js and Git | Cloudflare account required |
+| **Cost** | Free | Free (within Cloudflare's free tier) |
+| **Access** | Your machine only | Accessible from anywhere |
+| **Data** | Stored locally as a file | Stored in Cloudflare D1 |
+| **Updates** | `git pull && npm start` | Automatic on push to `main` |
+
+- **Local** — Runs on your own computer (Windows or Linux). No account needed. See [Running locally](#running-locally-without-cloudflare).
+- **Cloudflare** — Hosted in the cloud, accessible from any device. See [Deployment](#deployment).
+
 ## Features
 
 - **Dashboard** — Overview of recurring costs per period with status (paid, open, skipped)
@@ -19,8 +34,8 @@ A personal finance web app to track recurring costs, import bank statements, and
 
 ## Tech Stack
 
-| Laag | Technologie |
-|------|-------------|
+| Layer | Technology |
+|-------|------------|
 | Frontend | Vanilla HTML/CSS/JS, Chart.js |
 | Backend | Cloudflare Workers (Pages Functions) |
 | Database | Cloudflare D1 (SQLite) |
@@ -54,7 +69,195 @@ A personal finance web app to track recurring costs, import bank statements, and
     └── pull_request_template.md # PR template
 ```
 
-## Local development
+## Running locally (without Cloudflare)
+
+No Cloudflare account needed. The app runs entirely on your own machine with a local SQLite database. Choose your operating system below.
+
+---
+
+### Windows
+
+#### Step 1 — Install Node.js
+
+Go to [nodejs.org](https://nodejs.org/) and download the **LTS** version. Run the installer and click through with the default settings.
+
+Or via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+
+```
+winget install OpenJS.NodeJS.LTS
+```
+
+#### Step 2 — Install Git
+
+Go to [git-scm.com/downloads](https://git-scm.com/downloads/win) and download Git for Windows. Run the installer with the default settings.
+
+#### Step 3 — Verify the installation
+
+Open **Command Prompt** or **PowerShell** (search for "cmd" or "powershell" in the Start menu) and run:
+
+```
+node --version
+git --version
+```
+
+Both commands should print a version number. If they do, continue.
+
+#### Step 4 — Download the app
+
+```
+git clone https://github.com/jrhimself/vastelasten.git
+cd vastelasten
+npm install
+```
+
+#### Step 5 — Set a password (optional)
+
+Create a file named `.env` in the `vastelasten` folder. Open Notepad, paste the lines below, and save as `.env` (make sure it is not saved as `.env.txt`):
+
+```
+AUTH_PASSWORD=choose-a-password
+AUTH_SECRET=some-random-secret-string
+```
+
+> No password needed? Skip this step — the app will be accessible without login.
+
+#### Step 6 — Start the app
+
+```
+npm start
+```
+
+Open your browser at **http://localhost:3000**.
+
+---
+
+### Linux (Ubuntu / Debian / Raspberry Pi)
+
+#### Step 1 — Install Node.js
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+Or via [nvm](https://github.com/nvm-sh/nvm) if you want to manage multiple Node versions:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.bashrc
+nvm install 22
+```
+
+#### Step 2 — Install Git
+
+Git is pre-installed on most Linux systems. If not:
+
+```bash
+sudo apt-get install -y git
+```
+
+#### Step 3 — Verify the installation
+
+```bash
+node --version
+git --version
+```
+
+#### Step 4 — Download the app
+
+```bash
+git clone https://github.com/jrhimself/vastelasten.git
+cd vastelasten
+npm install
+```
+
+#### Step 5 — Set a password (optional)
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Edit the values, then save with `Ctrl+O`, `Enter`, and exit with `Ctrl+X`.
+
+> No password needed? Skip this step — the app will be accessible without login.
+
+#### Step 6 — Start the app
+
+```bash
+npm start
+```
+
+Open your browser at **http://localhost:3000**.
+
+On a headless server (e.g. Raspberry Pi): open the app on another device via `http://<ip-address>:3000`. Find the IP address with `hostname -I`.
+
+---
+
+### Updating to a new version
+
+The same steps apply for both Windows and Linux:
+
+```bash
+git pull
+npm install
+npm start
+```
+
+Your data in `vastelasten.db` is preserved.
+
+---
+
+### FAQ
+
+**Different port?** Add `PORT=4000` to your `.env` file.
+
+**Stop the app?** Press `Ctrl + C` in the terminal.
+
+**App won't start?** Make sure `node --version` shows version 22 or higher and that you have run `npm install`.
+
+---
+
+## Cloudflare hosting
+
+Host the app in the cloud so it's accessible from any device. Requires a free [Cloudflare account](https://dash.cloudflare.com/sign-up) and the [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/).
+
+### Setup
+
+**1. Create a D1 database**
+
+```bash
+npx wrangler d1 create vaste-lasten-db
+```
+
+Copy the `database_id` from the output and update `wrangler.toml` if needed.
+
+**2. Apply the schema**
+
+```bash
+npx wrangler d1 execute vaste-lasten-db --remote --file=schema.sql
+```
+
+**3. Deploy**
+
+```bash
+npx wrangler pages deploy public
+```
+
+Or connect the repository to Cloudflare Pages via the dashboard for automatic deploys on every push to `main`.
+
+### Local development (Wrangler)
+
+```bash
+npm install
+npx wrangler pages dev public/ --d1 DB=vaste-lasten-db
+```
+
+On first run, apply the schema locally:
+
+```bash
+npx wrangler d1 execute vaste-lasten-db --local --file=schema.sql
+```
 
 ```bash
 npm install

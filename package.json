@@ -3,7 +3,12 @@
   "version": "1.3.0",
   "description": "Vaste lasten tracker",
   "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
+    "start": "node server.js",
+    "dev": "wrangler pages dev public",
     "test": "vitest run",
     "lint": "eslint public/app.js functions/ lib/ test/"
   },
