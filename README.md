@@ -19,8 +19,8 @@ A personal finance web app to track recurring costs, import bank statements, and
 
 ## Tech Stack
 
-| Laag | Technologie |
-|------|-------------|
+| Layer | Technology |
+|-------|------------|
 | Frontend | Vanilla HTML/CSS/JS, Chart.js |
 | Backend | Cloudflare Workers (Pages Functions) |
 | Database | Cloudflare D1 (SQLite) |
@@ -54,40 +54,40 @@ A personal finance web app to track recurring costs, import bank statements, and
     └── pull_request_template.md # PR template
 ```
 
-## Lokaal draaien (zonder Cloudflare)
+## Running locally (without Cloudflare)
 
-Geen Cloudflare account nodig. De app draait volledig lokaal met een SQLite database op je eigen computer. Kies hieronder je besturingssysteem.
+No Cloudflare account needed. The app runs entirely on your own machine with a local SQLite database. Choose your operating system below.
 
 ---
 
 ### Windows
 
-#### Stap 1 — Node.js installeren
+#### Step 1 — Install Node.js
 
-Ga naar [nodejs.org](https://nodejs.org/) en download de **LTS** versie. Voer het installatieprogramma uit en klik alles op "Next".
+Go to [nodejs.org](https://nodejs.org/) and download the **LTS** version. Run the installer and click through with the default settings.
 
-Of via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/) als je dat hebt:
+Or via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
 
 ```
 winget install OpenJS.NodeJS.LTS
 ```
 
-#### Stap 2 — Git installeren
+#### Step 2 — Install Git
 
-Ga naar [git-scm.com/downloads](https://git-scm.com/downloads/win) en download Git voor Windows. Voer het installatieprogramma uit (standaardinstellingen zijn prima).
+Go to [git-scm.com/downloads](https://git-scm.com/downloads/win) and download Git for Windows. Run the installer with the default settings.
 
-#### Stap 3 — Controleer de installatie
+#### Step 3 — Verify the installation
 
-Open **Opdrachtprompt** of **PowerShell** (zoek op "cmd" of "powershell" in het Startmenu) en typ:
+Open **Command Prompt** or **PowerShell** (search for "cmd" or "powershell" in the Start menu) and run:
 
 ```
 node --version
 git --version
 ```
 
-Beide commando's moeten een versienummer tonen. Als dat lukt, ga dan verder.
+Both commands should print a version number. If they do, continue.
 
-#### Stap 4 — Download de app
+#### Step 4 — Download the app
 
 ```
 git clone https://github.com/jrhimself/vastelasten.git
@@ -95,37 +95,37 @@ cd vastelasten
 npm install
 ```
 
-#### Stap 5 — Wachtwoord instellen (optioneel)
+#### Step 5 — Set a password (optional)
 
-Maak in de map `vastelasten` een bestand aan met de naam `.env`. Open Kladblok, plak de onderstaande regels, en sla op als `.env` (let op: niet als `.env.txt`):
+Create a file named `.env` in the `vastelasten` folder. Open Notepad, paste the lines below, and save as `.env` (make sure it is not saved as `.env.txt`):
 
 ```
-AUTH_PASSWORD=kies-een-wachtwoord
-AUTH_SECRET=willekeurige-geheime-sleutel
+AUTH_PASSWORD=choose-a-password
+AUTH_SECRET=some-random-secret-string
 ```
 
-> Wil je geen wachtwoord? Sla deze stap over — de app is dan direct toegankelijk.
+> No password needed? Skip this step — the app will be accessible without login.
 
-#### Stap 6 — Start de app
+#### Step 6 — Start the app
 
 ```
 npm start
 ```
 
-Open je browser op **http://localhost:3000**.
+Open your browser at **http://localhost:3000**.
 
 ---
 
 ### Linux (Ubuntu / Debian / Raspberry Pi)
 
-#### Stap 1 — Node.js installeren
+#### Step 1 — Install Node.js
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 ```
 
-Of via [nvm](https://github.com/nvm-sh/nvm) als je meerdere Node versies wilt beheren:
+Or via [nvm](https://github.com/nvm-sh/nvm) if you want to manage multiple Node versions:
 
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
@@ -133,22 +133,22 @@ source ~/.bashrc
 nvm install 22
 ```
 
-#### Stap 2 — Git installeren
+#### Step 2 — Install Git
 
-Op de meeste Linux-systemen is Git al aanwezig. Zo niet:
+Git is pre-installed on most Linux systems. If not:
 
 ```bash
 sudo apt-get install -y git
 ```
 
-#### Stap 3 — Controleer de installatie
+#### Step 3 — Verify the installation
 
 ```bash
 node --version
 git --version
 ```
 
-#### Stap 4 — Download de app
+#### Step 4 — Download the app
 
 ```bash
 git clone https://github.com/jrhimself/vastelasten.git
@@ -156,32 +156,32 @@ cd vastelasten
 npm install
 ```
 
-#### Stap 5 — Wachtwoord instellen (optioneel)
+#### Step 5 — Set a password (optional)
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Pas de waarden aan en sla op met `Ctrl+O`, daarna `Enter`, dan `Ctrl+X`.
+Edit the values, then save with `Ctrl+O`, `Enter`, and exit with `Ctrl+X`.
 
-> Wil je geen wachtwoord? Sla deze stap over — de app is dan direct toegankelijk.
+> No password needed? Skip this step — the app will be accessible without login.
 
-#### Stap 6 — Start de app
+#### Step 6 — Start the app
 
 ```bash
 npm start
 ```
 
-Open je browser op **http://localhost:3000**.
+Open your browser at **http://localhost:3000**.
 
-Op een server zonder browser (bijv. Raspberry Pi): open de app op een ander apparaat via `http://<ip-adres>:3000`. Je vindt het IP-adres met `hostname -I`.
+On a headless server (e.g. Raspberry Pi): open the app on another device via `http://<ip-address>:3000`. Find the IP address with `hostname -I`.
 
 ---
 
-### Updaten naar een nieuwe versie
+### Updating to a new version
 
-Zelfde stappen voor Windows en Linux:
+The same steps apply for both Windows and Linux:
 
 ```bash
 git pull
@@ -189,17 +189,17 @@ npm install
 npm start
 ```
 
-Je gegevens in `vastelasten.db` blijven bewaard.
+Your data in `vastelasten.db` is preserved.
 
 ---
 
-### Veelgestelde vragen
+### FAQ
 
-**Andere poort?** Voeg `PORT=4000` toe aan je `.env` bestand.
+**Different port?** Add `PORT=4000` to your `.env` file.
 
-**App stoppen?** Druk op `Ctrl + C` in de terminal.
+**Stop the app?** Press `Ctrl + C` in the terminal.
 
-**App start niet op?** Controleer of `node --version` versie 22 of hoger toont en of je `npm install` hebt uitgevoerd.
+**App won't start?** Make sure `node --version` shows version 22 or higher and that you have run `npm install`.
 
 ---
 
