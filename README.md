@@ -54,7 +54,156 @@ A personal finance web app to track recurring costs, import bank statements, and
     └── pull_request_template.md # PR template
 ```
 
-## Local development
+## Lokaal draaien (zonder Cloudflare)
+
+Geen Cloudflare account nodig. De app draait volledig lokaal met een SQLite database op je eigen computer. Kies hieronder je besturingssysteem.
+
+---
+
+### Windows
+
+#### Stap 1 — Node.js installeren
+
+Ga naar [nodejs.org](https://nodejs.org/) en download de **LTS** versie. Voer het installatieprogramma uit en klik alles op "Next".
+
+Of via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/) als je dat hebt:
+
+```
+winget install OpenJS.NodeJS.LTS
+```
+
+#### Stap 2 — Git installeren
+
+Ga naar [git-scm.com/downloads](https://git-scm.com/downloads/win) en download Git voor Windows. Voer het installatieprogramma uit (standaardinstellingen zijn prima).
+
+#### Stap 3 — Controleer de installatie
+
+Open **Opdrachtprompt** of **PowerShell** (zoek op "cmd" of "powershell" in het Startmenu) en typ:
+
+```
+node --version
+git --version
+```
+
+Beide commando's moeten een versienummer tonen. Als dat lukt, ga dan verder.
+
+#### Stap 4 — Download de app
+
+```
+git clone https://github.com/jrhimself/vastelasten.git
+cd vastelasten
+npm install
+```
+
+#### Stap 5 — Wachtwoord instellen (optioneel)
+
+Maak in de map `vastelasten` een bestand aan met de naam `.env`. Open Kladblok, plak de onderstaande regels, en sla op als `.env` (let op: niet als `.env.txt`):
+
+```
+AUTH_PASSWORD=kies-een-wachtwoord
+AUTH_SECRET=willekeurige-geheime-sleutel
+```
+
+> Wil je geen wachtwoord? Sla deze stap over — de app is dan direct toegankelijk.
+
+#### Stap 6 — Start de app
+
+```
+npm start
+```
+
+Open je browser op **http://localhost:3000**.
+
+---
+
+### Linux (Ubuntu / Debian / Raspberry Pi)
+
+#### Stap 1 — Node.js installeren
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+Of via [nvm](https://github.com/nvm-sh/nvm) als je meerdere Node versies wilt beheren:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.bashrc
+nvm install 22
+```
+
+#### Stap 2 — Git installeren
+
+Op de meeste Linux-systemen is Git al aanwezig. Zo niet:
+
+```bash
+sudo apt-get install -y git
+```
+
+#### Stap 3 — Controleer de installatie
+
+```bash
+node --version
+git --version
+```
+
+#### Stap 4 — Download de app
+
+```bash
+git clone https://github.com/jrhimself/vastelasten.git
+cd vastelasten
+npm install
+```
+
+#### Stap 5 — Wachtwoord instellen (optioneel)
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Pas de waarden aan en sla op met `Ctrl+O`, daarna `Enter`, dan `Ctrl+X`.
+
+> Wil je geen wachtwoord? Sla deze stap over — de app is dan direct toegankelijk.
+
+#### Stap 6 — Start de app
+
+```bash
+npm start
+```
+
+Open je browser op **http://localhost:3000**.
+
+Op een server zonder browser (bijv. Raspberry Pi): open de app op een ander apparaat via `http://<ip-adres>:3000`. Je vindt het IP-adres met `hostname -I`.
+
+---
+
+### Updaten naar een nieuwe versie
+
+Zelfde stappen voor Windows en Linux:
+
+```bash
+git pull
+npm install
+npm start
+```
+
+Je gegevens in `vastelasten.db` blijven bewaard.
+
+---
+
+### Veelgestelde vragen
+
+**Andere poort?** Voeg `PORT=4000` toe aan je `.env` bestand.
+
+**App stoppen?** Druk op `Ctrl + C` in de terminal.
+
+**App start niet op?** Controleer of `node --version` versie 22 of hoger toont en of je `npm install` hebt uitgevoerd.
+
+---
+
+## Local development (Cloudflare / Wrangler)
 
 ```bash
 npm install
