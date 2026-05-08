@@ -140,7 +140,7 @@ Both commands should print a version number. If they do, continue.
 #### Step 4 — Download the app
 
 ```
-git clone https://github.com/jrhimself/vastelasten.git
+git clone https://github.com/jrhimself/fixed-expenses.git
 cd vastelasten
 npm install
 ```
@@ -201,7 +201,7 @@ git --version
 #### Step 4 — Download the app
 
 ```bash
-git clone https://github.com/jrhimself/vastelasten.git
+git clone https://github.com/jrhimself/fixed-expenses.git
 cd vastelasten
 npm install
 ```
