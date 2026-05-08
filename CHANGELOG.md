@@ -5,6 +5,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.5.0] - 2026-05-08
+
+### Added
+- Activate button in the `•••` actions menu for period-inactive recurring costs — activates the cost for the selected period and all following periods in the same year
+
+---
+
 ## [1.3.0] - 2026-05-05
 
 ### Changed

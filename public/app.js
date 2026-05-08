@@ -1,6 +1,6 @@
 // Versie
 (function() {
-  const base = 'v1.4.0';
+  const base = 'v1.5.0';
   const versie = window.location.hostname.endsWith('.pages.dev') ? base + '-preview' : base;
   document.getElementById('app-versie').textContent = versie;
 })();
