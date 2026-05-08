@@ -753,8 +753,8 @@ async function handlePeriodes(path, method, request, env) {
       grens.setDate(grens.getDate() - 20);
       const grensStr = grens.toISOString().slice(0, 10);
       const [{ results: transacties }, { results: randTransacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
-        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id=? OR gekoppeld_last_id IS NULL)`).bind(p.id, lastId).all(),
-        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id IS NULL OR gekoppeld_last_id=?)`).bind(p.id, grensStr, p.start_datum, lastId).all(),
+        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0 AND gekoppeld_last_id IS NULL`).bind(p.id).all(),
+        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0 AND gekoppeld_last_id IS NULL`).bind(p.id, grensStr, p.start_datum).all(),
         env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(p.id).all(),
         env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(p.id).all(),
       ]);
@@ -762,9 +762,9 @@ async function handlePeriodes(path, method, request, env) {
       const matchbare = effectieveLastenPeriode.filter(l => !uitgesloten.has(l.id));
       for (const t of transacties) {
         const matchId = autoMatch(t, matchbare, p);
-        if (t.gekoppeld_last_id === lastId || matchId === lastId) {
-          alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(matchId ?? null, t.id));
-          if (matchId === lastId) gematcht++;
+        if (matchId === lastId) {
+          alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(matchId, t.id));
+          gematcht++;
         }
       }
       // Rand-transacties uit vorige periode: als ze matchen én datum dicht bij verwachte dag ligt, verplaats naar deze periode
