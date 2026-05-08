@@ -735,19 +735,14 @@ async function handlePeriodes(path, method, request, env) {
     let gematcht = 0;
     const alleUpdates = [];
 
-    for (let i = 0; i < volgendePeriodes.length; i++) {
-      const p = volgendePeriodes[i];
+    for (const p of volgendePeriodes) {
       const effectieveLastenPeriode = applyJaarOverridesOpLasten(lasten, jaarOverrides, p.start_datum);
       const grens = new Date(p.start_datum);
       grens.setDate(grens.getDate() - 20);
       const grensStr = grens.toISOString().slice(0, 10);
-      const volgende = volgendePeriodes[i + 1];
-      const voorwaartseGrens = new Date(volgende ? volgende.start_datum : p.start_datum);
-      voorwaartseGrens.setDate(voorwaartseGrens.getDate() + (volgende ? 5 : 0));
-      const voorwaartseGrensStr = voorwaartseGrens.toISOString().slice(0, 10);
       const [{ results: transacties }, { results: randTransacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
         env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id=? OR gekoppeld_last_id IS NULL)`).bind(p.id, lastId).all(),
-        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id IS NULL OR gekoppeld_last_id=?)`).bind(p.id, grensStr, voorwaartseGrensStr, lastId).all(),
+        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id IS NULL OR gekoppeld_last_id=?)`).bind(p.id, grensStr, p.start_datum, lastId).all(),
         env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(p.id).all(),
         env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(p.id).all(),
       ]);
@@ -760,7 +755,7 @@ async function handlePeriodes(path, method, request, env) {
           if (matchId === lastId) gematcht++;
         }
       }
-      // Rand-transacties: als ze matchen, verplaats naar deze periode
+      // Rand-transacties uit vorige periode: als ze matchen, verplaats naar deze periode
       for (const t of randTransacties) {
         const matchId = autoMatch(t, matchbare, p);
         if (matchId === lastId) {
@@ -789,19 +784,14 @@ async function handlePeriodes(path, method, request, env) {
     let gematcht = 0, hermatcht = 0;
     const alleUpdates = [];
 
-    for (let i = 0; i < volgendePeriodes.length; i++) {
-      const p = volgendePeriodes[i];
+    for (const p of volgendePeriodes) {
       const effectieveLastenPeriode = applyJaarOverridesOpLasten(lasten, jaarOverrides, p.start_datum);
       const grens = new Date(p.start_datum);
       grens.setDate(grens.getDate() - 20);
       const grensStr = grens.toISOString().slice(0, 10);
-      const volgende = volgendePeriodes[i + 1];
-      const voorwaartseGrens = new Date(volgende ? volgende.start_datum : p.start_datum);
-      voorwaartseGrens.setDate(voorwaartseGrens.getDate() + (volgende ? 5 : 0));
-      const voorwaartseGrensStr = voorwaartseGrens.toISOString().slice(0, 10);
       const [{ results: transacties }, { results: randTransacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
         env.DB.prepare('SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0').bind(p.id).all(),
-        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0`).bind(p.id, grensStr, voorwaartseGrensStr).all(),
+        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0`).bind(p.id, grensStr, p.start_datum).all(),
         env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(p.id).all(),
         env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(p.id).all(),
       ]);
