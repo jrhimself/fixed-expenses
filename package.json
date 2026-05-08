@@ -1,6 +1,6 @@
 {
   "name": "vaste-lasten",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Fixed Expenses — personal finance app for tracking recurring costs",
   "type": "module",
   "engines": {
