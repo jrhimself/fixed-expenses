@@ -5,6 +5,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.5.4] - 2026-05-08
+
+### Changed
+- Rematch (hermatch) now only touches unlinked transactions — already-matched transactions are never unlinked or re-evaluated
+- After a successful rematch, only the affected row is updated in the DOM; no full dashboard reload required
+
+---
+
 ## [1.5.3] - 2026-05-08
 
 ### Fixed
