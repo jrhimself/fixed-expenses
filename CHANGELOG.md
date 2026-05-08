@@ -5,6 +5,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.5.3] - 2026-05-08
+
+### Fixed
+- Boundary transactions (from an adjacent period) are now only moved during rematch if the transaction date is within 15 days of the expected payment day — prevents IBAN/description matches from pulling transactions that are clearly in the wrong period (e.g. an April 7 transaction matched to a May 5 cost)
+
+---
+
 ## [1.5.2] - 2026-05-08
 
 ### Fixed
