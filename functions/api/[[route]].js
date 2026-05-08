@@ -202,6 +202,18 @@ async function handleLasten(path, method, request, env) {
   return null;
 }
 
+// Returns true if transaction date is within 15 days of the expected day in the given period.
+// Used to guard boundary transactions (from another period) against false IBAN/description matches.
+function datumBinnenVerwachtingsvenster(transactieDatum, verwachteDag, periodeStartDatum) {
+  if (!verwachteDag || !transactieDatum || !periodeStartDatum) return true;
+  const start = new Date(periodeStartDatum);
+  let verwacht = new Date(start);
+  verwacht.setDate(verwachteDag);
+  if (verwacht < start) verwacht.setMonth(verwacht.getMonth() + 1);
+  const daysDiff = Math.abs(new Date(transactieDatum) - verwacht) / (1000 * 60 * 60 * 24);
+  return daysDiff <= 15;
+}
+
 function applyJaarOverridesOpLasten(lasten, jaarOverrides, periodeDatum = '9999-99-99') {
   if (!jaarOverrides.length) return lasten;
 
@@ -755,10 +767,12 @@ async function handlePeriodes(path, method, request, env) {
           if (matchId === lastId) gematcht++;
         }
       }
-      // Rand-transacties uit vorige periode: als ze matchen, verplaats naar deze periode
+      // Rand-transacties uit vorige periode: als ze matchen én datum dicht bij verwachte dag ligt, verplaats naar deze periode
       for (const t of randTransacties) {
         const matchId = autoMatch(t, matchbare, p);
         if (matchId === lastId) {
+          const last = matchbare.find(l => l.id === matchId);
+          if (!datumBinnenVerwachtingsvenster(t.datum, last?.verwachte_dag, p.start_datum)) continue;
           alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=?, periode_id=? WHERE id=?').bind(matchId, p.id, t.id));
           gematcht++;
         }
@@ -804,10 +818,12 @@ async function handlePeriodes(path, method, request, env) {
         alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(lastId ?? null, t.id));
         hermatcht++;
       }
-      // Rand-transacties: alleen verplaatsen als deze periode nog geen match heeft voor die last
+      // Rand-transacties: alleen verplaatsen als datum dicht bij verwachte dag ligt én periode nog geen match heeft
       for (const t of randTransacties) {
         const lastId = autoMatch(t, matchbare, p);
         if (lastId && !alGematchteLastIds.has(lastId)) {
+          const last = matchbare.find(l => l.id === lastId);
+          if (!datumBinnenVerwachtingsvenster(t.datum, last?.verwachte_dag, p.start_datum)) continue;
           alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=?, periode_id=? WHERE id=?').bind(lastId, p.id, t.id));
           alGematchteLastIds.add(lastId);
           gematcht++;
