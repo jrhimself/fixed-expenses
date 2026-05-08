@@ -5,6 +5,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.5.1] - 2026-05-08
+
+### Fixed
+- Transactions moved to the next period by a previous rematch (e.g. a payment on the salary day) are now visible and rematchable from the current period — the boundary search window now also looks forward up to 5 days into the next period
+
+### Changed
+- CI workflow now supports manual deploys to Cloudflare via `workflow_dispatch` — useful for testing against the live D1 database from a feature branch
+
+---
+
 ## [1.5.0] - 2026-05-08
 
 ### Added
