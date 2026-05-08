@@ -74,6 +74,16 @@ function mapBankRow(row) {
     };
   }
 
+  // Sparkasse (Germany): semicolon-separated, German column names
+  if (keys.includes('buchungstag') && keys.includes('verwendungszweck')) {
+    return {
+      datum: parseDate(row['buchungstag']),
+      bedrag: parseEuropeanAmount(row['betrag']),
+      omschrijving: row['verwendungszweck'] || row['buchungstext'] || '',
+      tegenrekening: row['kontonummer/iban'] || ''
+    };
+  }
+
   const datumKey = keys.find(k => k.includes('datum') || k.includes('date'));
   const bedragKey = keys.find(k => k.includes('bedrag') || k.includes('amount'));
   const omschrijvingKey = keys.find(k => k.includes('omschrijving') || k.includes('description') || k.includes('naam'));
@@ -265,6 +275,24 @@ async function kopieerJaarOverridesIndienNieuw(nieuwJaar, env) {
 
 async function handlePeriodes(path, method, request, env) {
   let m;
+
+  // DELETE /periodes/jaar/:jaar — must be before /:id patterns
+  if ((m = matchPath('/periodes/jaar/:jaar', path)) && method === 'DELETE') {
+    const { results: periodes } = await env.DB.prepare(
+      "SELECT id FROM periodes WHERE start_datum LIKE ?"
+    ).bind(`${m.jaar}-%`).all();
+    if (periodes.length) {
+      const ids = periodes.map(p => p.id);
+      const placeholders = ids.map(() => '?').join(',');
+      await env.DB.batch([
+        env.DB.prepare(`DELETE FROM bank_transacties WHERE periode_id IN (${placeholders})`).bind(...ids),
+        env.DB.prepare(`DELETE FROM periode_overgeslagen WHERE periode_id IN (${placeholders})`).bind(...ids),
+        env.DB.prepare(`DELETE FROM vaste_last_periode_actief WHERE periode_id IN (${placeholders})`).bind(...ids),
+        env.DB.prepare(`DELETE FROM periodes WHERE id IN (${placeholders})`).bind(...ids),
+      ]);
+    }
+    return Response.json({ verwijderd: periodes.length });
+  }
 
   // POST /periodes/markeer-verleden-betaald  (must be before /:id patterns)
   if (path === '/periodes/markeer-verleden-betaald' && method === 'POST') {
@@ -897,6 +925,8 @@ async function handlePeriodes(path, method, request, env) {
   if ((m = matchPath('/periodes/:id', path)) && method === 'DELETE') {
     await env.DB.batch([
       env.DB.prepare('DELETE FROM bank_transacties WHERE periode_id=?').bind(m.id),
+      env.DB.prepare('DELETE FROM periode_overgeslagen WHERE periode_id=?').bind(m.id),
+      env.DB.prepare('DELETE FROM vaste_last_periode_actief WHERE periode_id=?').bind(m.id),
       env.DB.prepare('DELETE FROM periodes WHERE id=?').bind(m.id),
     ]);
     return Response.json({ ok: true });
