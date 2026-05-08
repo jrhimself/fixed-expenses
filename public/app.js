@@ -394,6 +394,60 @@ function toggleGrafieken(btn) {
   pijl.textContent = ingeklapt ? '▼' : '▶';
 }
 
+function renderRij(o, isAlleMode) {
+  const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
+  const eenmaligGeaccepteerd = o.betaling?.bedrag_afwijking_geaccepteerd === 1;
+  const bedragAfwijking = !o.variabel && !eenmaligGeaccepteerd && o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
+    Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
+
+  const ctx = isAlleMode ? `setAlleModePeriode(${o.periode_id});` : '';
+  const periodeLabel = isAlleMode && o.periode_start ? periodeNaam({ start_datum: o.periode_start }) : null;
+
+  const kanMarkeren = o.status !== 'betaald' && o.status !== 'inactief';
+  const menuItems = [];
+
+  if (o.periode_inactief) {
+    menuItems.push(`<button onclick="${ctx}activeerLastVoorPeriode(${o.id});sluitActiesMenu()">${t('action.activateFromHere')}</button>`);
+    menuItems.push(`<div class="menu-divider"></div>`);
+  }
+
+  if (kanMarkeren) {
+    menuItems.push(`<button onclick="${ctx}markeerBetaald(${o.id});sluitActiesMenu()">${t('action.markPaid')}</button>`);
+    menuItems.push(`<div class="menu-divider"></div>`);
+    menuItems.push(`<button onclick="${ctx}openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">${t('action.findTransaction')}</button>`);
+    menuItems.push(`<button onclick="${ctx}hermatchenLast(${o.id});sluitActiesMenu()">${t('action.rematch')}</button>`);
+  }
+  if (o.status === 'betaald' && o.handmatig_betaald) {
+    menuItems.push(`<button class="danger" onclick="${ctx}ongedaanMarkering(${o.id});sluitActiesMenu()">${t('action.undoMark')}</button>`);
+  }
+  if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
+    const periodeArg = isAlleMode ? `,${o.periode_id}` : '';
+    menuItems.push(`<button onclick="${ctx}toonMatchDetail(${o.id}${periodeArg});sluitActiesMenu()">${t('action.viewMatch')}</button>`);
+  }
+  menuItems.push(`<div class="menu-divider"></div>`);
+  menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">${t('action.edit')}</button>`);
+  menuItems.push(`<button class="danger" onclick="${ctx}verwijderLast(${o.id});sluitActiesMenu()">${t('action.delete')}</button>`);
+
+  const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
+  const acties = `
+      <div class="acties-menu">
+        <button class="acties-btn" onclick="toggleActiesMenu(this, event)">•••</button>
+        <div class="acties-dropdown">${menuItems.join('')}</div>
+      </div>`;
+  const vierdeKolom = isAlleMode
+    ? `<td${dimStijl}>${periodeLabel || '—'}</td><td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>`
+    : `<td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>`;
+  return `<tr data-last-id="${o.id}"${bedragAfwijking ? ' class="bedrag-afwijking"' : ''}>
+      <td${dimStijl}><strong>${esc(o.naam)}</strong></td>
+      <td${dimStijl}>${euro(o.bedrag)}</td>
+      <td${dimStijl}>${esc(o.categorie || '—')}</td>
+      ${vierdeKolom}
+      <td${dimStijl}><span class="badge ${o.status}">${statusLabel(o.status)}</span></td>
+      <td${dimStijl} style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}${eenmaligGeaccepteerd ? ' <span title="Bedrag eenmalig geaccepteerd" style="color:#d97706;font-weight:600">~</span>' : ''}` : o.handmatig_betaald ? `<em>${t('manual')}</em>` : '—'}</td>
+      <td style="white-space:nowrap">${acties}</td>
+    </tr>`;
+}
+
 function renderDashboardTabel() {
   const isAlleMode = document.getElementById('periode-select').value === 'alle';
 
@@ -413,60 +467,7 @@ function renderDashboardTabel() {
     euro(o.bedrag).replace(/[\s€]/g, '').includes(zoekterm.replace(',', '.'))
   );
 
-  const rijen = gefilterd.map(o => {
-    const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
-    const eenmaligGeaccepteerd = o.betaling?.bedrag_afwijking_geaccepteerd === 1;
-    const bedragAfwijking = !o.variabel && !eenmaligGeaccepteerd && o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
-      Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
-
-    // ctx: set period context first when in alle-modus
-    const ctx = isAlleMode ? `setAlleModePeriode(${o.periode_id});` : '';
-    const periodeLabel = isAlleMode && o.periode_start ? periodeNaam({ start_datum: o.periode_start }) : null;
-
-    const kanMarkeren = o.status !== 'betaald' && o.status !== 'inactief';
-    const menuItems = [];
-
-    if (o.periode_inactief) {
-      menuItems.push(`<button onclick="${ctx}activeerLastVoorPeriode(${o.id});sluitActiesMenu()">${t('action.activateFromHere')}</button>`);
-      menuItems.push(`<div class="menu-divider"></div>`);
-    }
-
-    if (kanMarkeren) {
-      menuItems.push(`<button onclick="${ctx}markeerBetaald(${o.id});sluitActiesMenu()">${t('action.markPaid')}</button>`);
-      menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="${ctx}openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">${t('action.findTransaction')}</button>`);
-      menuItems.push(`<button onclick="${ctx}hermatchenLast(${o.id});sluitActiesMenu()">${t('action.rematch')}</button>`);
-    }
-    if (o.status === 'betaald' && o.handmatig_betaald) {
-      menuItems.push(`<button class="danger" onclick="${ctx}ongedaanMarkering(${o.id});sluitActiesMenu()">${t('action.undoMark')}</button>`);
-    }
-    if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
-      const periodeArg = isAlleMode ? `,${o.periode_id}` : '';
-      menuItems.push(`<button onclick="${ctx}toonMatchDetail(${o.id}${periodeArg});sluitActiesMenu()">${t('action.viewMatch')}</button>`);
-    }
-    menuItems.push(`<div class="menu-divider"></div>`);
-    menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">${t('action.edit')}</button>`);
-    menuItems.push(`<button class="danger" onclick="${ctx}verwijderLast(${o.id});sluitActiesMenu()">${t('action.delete')}</button>`);
-
-    const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
-    const acties = `
-      <div class="acties-menu">
-        <button class="acties-btn" onclick="toggleActiesMenu(this, event)">•••</button>
-        <div class="acties-dropdown">${menuItems.join('')}</div>
-      </div>`;
-    const vierdeKolom = isAlleMode
-      ? `<td${dimStijl}>${periodeLabel || '—'}</td><td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>`
-      : `<td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>`;
-    return `<tr${bedragAfwijking ? ' class="bedrag-afwijking"' : ''}>
-      <td${dimStijl}><strong>${esc(o.naam)}</strong></td>
-      <td${dimStijl}>${euro(o.bedrag)}</td>
-      <td${dimStijl}>${esc(o.categorie || '—')}</td>
-      ${vierdeKolom}
-      <td${dimStijl}><span class="badge ${o.status}">${statusLabel(o.status)}</span></td>
-      <td${dimStijl} style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}${eenmaligGeaccepteerd ? ' <span title="Bedrag eenmalig geaccepteerd" style="color:#d97706;font-weight:600">~</span>' : ''}` : o.handmatig_betaald ? `<em>${t('manual')}</em>` : '—'}</td>
-      <td style="white-space:nowrap">${acties}</td>
-    </tr>`;
-  }).join('');
+  const rijen = gefilterd.map(o => renderRij(o, isAlleMode)).join('');
 
   const colspan = isAlleMode ? 8 : 7;
   const geenResultaat = gefilterd.length === 0
@@ -524,7 +525,19 @@ async function laadDashboard() {
 async function hermatchenLast(lastId) {
   try {
     const res = await api(`/api/periodes/${huidigePeriodeId}/hermatchen/${lastId}`, { method: 'POST' });
-    laadDashboard();
+    if (res.gematcht) {
+      const data = await api(`/api/periodes/${huidigePeriodeId}/overzicht`);
+      const item = data.overzicht.find(i => i.id === lastId);
+      if (item) {
+        const rij = document.querySelector(`tr[data-last-id="${lastId}"]`);
+        if (rij) {
+          const isAlleMode = document.getElementById('periode-select').value === 'alle';
+          rij.outerHTML = renderRij(item, isAlleMode);
+        }
+        const idx = dashboardOverzicht.findIndex(i => i.id === lastId);
+        if (idx !== -1) dashboardOverzicht[idx] = item;
+      }
+    }
     toonToast(res.gematcht ? t('toast.matchFound') : t('toast.noMatch'), res.gematcht ? 'ok' : 'info');
   } catch (e) {
     alert(t('alert.error', { error: e.message }));
