@@ -14,7 +14,12 @@ export default [
     languageOptions: {
       globals: {
         ...globals.browser,
-        Chart: 'readonly', // Chart.js loaded via <script> tag
+        Chart: 'readonly',    // Chart.js loaded via <script> tag
+        t: 'readonly',        // i18n.js globals
+        getLang: 'readonly',
+        setLang: 'readonly',
+        applyI18n: 'readonly',
+        MAANDEN_KORT: 'readonly',
       },
     },
     rules: {

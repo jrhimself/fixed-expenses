@@ -136,7 +136,7 @@ app.all('/api/*', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Vaste Lasten draait op http://localhost:${PORT}`);
+  console.log(`Fixed Expenses running at http://localhost:${PORT}`);
   if (!process.env.AUTH_PASSWORD) {
     console.log('Tip: stel AUTH_PASSWORD en AUTH_SECRET in via een .env bestand om authenticatie in te schakelen.');
   }

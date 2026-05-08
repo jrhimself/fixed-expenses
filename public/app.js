@@ -1,6 +1,6 @@
 // Versie
 (function() {
-  const base = 'v1.3.0';
+  const base = 'v1.4.0';
   const versie = window.location.hostname.endsWith('.pages.dev') ? base + '-preview' : base;
   document.getElementById('app-versie').textContent = versie;
 })();
@@ -15,13 +15,11 @@ let ongekoppeldeTransacties = [];
 let dashboardOverzicht = [];
 let appInstellingen = {};
 
-const MAANDEN_KORT = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
-
 function periodeNaam(p) {
   if (!p || !p.start_datum) return '—';
   const startMaand = parseInt(p.start_datum.split('-')[1]) - 1;
   const eindMaand = p.eind_datum ? parseInt(p.eind_datum.split('-')[1]) - 1 : (startMaand + 1) % 12;
-  return MAANDEN_KORT[startMaand] + '-' + MAANDEN_KORT[eindMaand];
+  return window.MAANDEN_KORT[startMaand] + '-' + window.MAANDEN_KORT[eindMaand];
 }
 
 function periodeNaamUniek(p, lijst) {
@@ -33,7 +31,8 @@ function periodeNaamUniek(p, lijst) {
 
 // Hulp
 function euro(n) {
-  return '€\u00a0' + (n || 0).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const locale = { nl: 'nl-NL', en: 'en-GB', de: 'de-DE' }[getLang()] || 'nl-NL';
+  return '€ ' + (n || 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function vulEinddatumIn(startWaarde) {
@@ -112,7 +111,7 @@ async function laadLasten() {
 function renderLasten() {
   const tbody = document.getElementById('lasten-body');
   if (!allLasten.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty">Nog geen vaste lasten. Voeg er een toe.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">${t('fixed.empty')}</td></tr>`;
     return;
   }
   tbody.innerHTML = allLasten.map(l => `
@@ -122,8 +121,8 @@ function renderLasten() {
       <td>${esc(l.categorie || '—')}</td>
       <td>${l.verwachte_dag ? l.verwachte_dag + 'e' : '—'}</td>
       <td style="text-align:right">
-        <button class="btn btn-sm btn-secondary" onclick="openModalLast(${l.id})">Bewerken</button>
-        <button class="btn btn-sm btn-danger" onclick="verwijderLast(${l.id})">Verwijderen</button>
+        <button class="btn btn-sm btn-secondary" onclick="openModalLast(${l.id})">${t('action.edit')}</button>
+        <button class="btn btn-sm btn-danger" onclick="verwijderLast(${l.id})">${t('action.delete')}</button>
       </td>
     </tr>
   `).join('');
@@ -133,7 +132,7 @@ function openModalLast(id, vanuitDashboard = false) {
   bewerkJaar = null;
   document.getElementById('last-id').value = '';
   document.getElementById('form-last').reset();
-  document.getElementById('modal-last-titel').textContent = 'Vaste last toevoegen';
+  document.getElementById('modal-last-titel').textContent = t('modal.fixed.titleAdd');
 
   if (id) {
     // Bepaal databron: dashboard (jaar-overrides al gemergd) of globale lijst
@@ -150,7 +149,7 @@ function openModalLast(id, vanuitDashboard = false) {
     }
 
     const titelSuffix = bewerkJaar ? ` (${bewerkJaar})` : '';
-    document.getElementById('modal-last-titel').textContent = 'Vaste last bewerken' + titelSuffix;
+    document.getElementById('modal-last-titel').textContent = t('modal.fixed.titleEdit') + titelSuffix;
     document.getElementById('last-id').value = l.id;
     document.getElementById('last-naam').value = l.naam;
     document.getElementById('last-bedrag').value = (l.bedrag || 0).toFixed(2);
@@ -170,7 +169,7 @@ async function submitLast(e) {
   const variabel = document.getElementById('last-variabel').checked ? 1 : 0;
   const bedragVal = parseFloat(document.getElementById('last-bedrag').value);
   if (!variabel && (!bedragVal || bedragVal <= 0)) {
-    alert('Bedrag is verplicht als het geen variabel bedrag is.');
+    alert(t('alert.amountRequired'));
     return;
   }
   const body = {
@@ -213,7 +212,7 @@ async function submitLast(e) {
 }
 
 async function verwijderLast(id) {
-  if (!confirm('Vaste last verwijderen?')) return;
+  if (!confirm(t('alert.deleteFixed'))) return;
   await api(`/api/lasten/${id}`, { method: 'DELETE' });
   await laadLasten();
   if (huidigePeriodeId) laadDashboard();
@@ -249,7 +248,7 @@ async function verwijderDuplicaatPeriodes() {
 function renderPeriodes() {
   const tbody = document.getElementById('periodes-body');
   if (!allPeriodes.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty">Nog geen periodes.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">${t('periods.empty')}</td></tr>`;
     return;
   }
   tbody.innerHTML = allPeriodes.map(p => `
@@ -259,8 +258,8 @@ function renderPeriodes() {
       <td>${p.salaris_bedrag ? euro(p.salaris_bedrag) : '—'}</td>
       <td>${esc(p.notities || '')}</td>
       <td style="text-align:right">
-        <button class="btn btn-sm btn-secondary" onclick="openModalPeriode(${p.id})">Bewerken</button>
-        <button class="btn btn-sm btn-danger" onclick="verwijderPeriode(${p.id})">Verwijderen</button>
+        <button class="btn btn-sm btn-secondary" onclick="openModalPeriode(${p.id})">${t('action.edit')}</button>
+        <button class="btn btn-sm btn-danger" onclick="verwijderPeriode(${p.id})">${t('action.delete')}</button>
       </td>
     </tr>
   `).join('');
@@ -279,8 +278,8 @@ function vulPeriodeSelect() {
   // Filter periodes op geselecteerd jaar
   const gefilterd = allPeriodes.filter(p => p.start_datum.startsWith(huidigJaar));
   const huidigPeriode = periSel.value;
-  periSel.innerHTML = (gefilterd.length ? '' : '<option value="">— geen periodes —</option>') +
-    (gefilterd.length ? '<option value="alle">Alle periodes</option>' : '') +
+  periSel.innerHTML = (gefilterd.length ? '' : `<option value="">${t('filter.noPeriods')}</option>`) +
+    (gefilterd.length ? `<option value="alle">${t('filter.allPeriods')}</option>` : '') +
     gefilterd.map(p => `<option value="${p.id}">${periodeNaamUniek(p, gefilterd)}</option>`).join('');
   // Behoud huidige selectie als die nog in de gefilterde lijst zit
   if (huidigPeriode && (huidigPeriode === 'alle' || gefilterd.find(p => String(p.id) === huidigPeriode))) {
@@ -292,8 +291,8 @@ function filterPeriodesByJaar(skipDashboard = false) {
   const jaarSel = document.getElementById('jaar-select');
   const periSel = document.getElementById('periode-select');
   const gefilterd = allPeriodes.filter(p => p.start_datum.startsWith(jaarSel.value));
-  periSel.innerHTML = (gefilterd.length ? '' : '<option value="">— geen periodes —</option>') +
-    (gefilterd.length ? '<option value="alle">Alle periodes</option>' : '') +
+  periSel.innerHTML = (gefilterd.length ? '' : `<option value="">${t('filter.noPeriods')}</option>`) +
+    (gefilterd.length ? `<option value="alle">${t('filter.allPeriods')}</option>` : '') +
     gefilterd.map(p => `<option value="${p.id}">${periodeNaamUniek(p, gefilterd)}</option>`).join('');
   if (!skipDashboard) laadDashboard();
 }
@@ -302,7 +301,7 @@ function openModalPeriode(id) {
   document.getElementById('periode-id').value = '';
   document.getElementById('form-periode').reset();
   document.getElementById('periode-eind').value = '';
-  document.getElementById('modal-periode-titel').textContent = 'Nieuwe periode';
+  document.getElementById('modal-periode-titel').textContent = t('modal.period.titleNew');
 
   if (!id) {
     suggereerVolgendePeriode();
@@ -311,7 +310,7 @@ function openModalPeriode(id) {
   if (id) {
     const p = allPeriodes.find(x => x.id === id);
     if (!p) return;
-    document.getElementById('modal-periode-titel').textContent = 'Periode bewerken';
+    document.getElementById('modal-periode-titel').textContent = t('modal.period.titleEdit');
     document.getElementById('periode-id').value = p.id;
     document.getElementById('periode-start').value = p.start_datum;
     document.getElementById('periode-eind').value = p.eind_datum || '';
@@ -338,7 +337,7 @@ async function submitPeriode(e) {
       huidigePeriodeId = res.id;
     }
   } catch (err) {
-    alert('Fout: ' + err.message);
+    alert(t('alert.error', { error: err.message }));
     return;
   }
   sluitModal('modal-periode');
@@ -350,13 +349,13 @@ async function submitPeriode(e) {
 }
 
 async function verwijderPeriode(id) {
-  if (!confirm('Periode en alle bijbehorende transacties verwijderen?')) return;
+  if (!confirm(t('alert.deletePeriod'))) return;
   await api(`/api/periodes/${id}`, { method: 'DELETE' });
   if (huidigePeriodeId === id) {
     huidigePeriodeId = null;
-    document.getElementById('dashboard-card').innerHTML = '<div class="empty">Selecteer of maak een periode aan om te beginnen.</div>';
+    document.getElementById('dashboard-card').innerHTML = `<div class="empty">${t('dashboard.empty')}</div>`;
     document.getElementById('totalen').style.display = 'none';
-    document.getElementById('transacties-sectie').style.display = 'none';
+    document.getElementById('transacties-sectie') && (document.getElementById('transacties-sectie').style.display = 'none');
   }
   laadPeriodes();
 }
@@ -377,7 +376,7 @@ function vulCategorieFilter() {
   const sel = document.getElementById('categorie-filter');
   const huidigCat = sel.value;
   const cats = [...new Set(dashboardOverzicht.map(o => o.categorie || '').filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">Alle categorieën</option>' +
+  sel.innerHTML = `<option value="">${t('filter.allCategories')}</option>` +
     cats.map(c => `<option value="${c}">${esc(c)}</option>`).join('');
   if (cats.includes(huidigCat)) sel.value = huidigCat;
 }
@@ -399,7 +398,7 @@ function renderDashboardTabel() {
   const isAlleMode = document.getElementById('periode-select').value === 'alle';
 
   if (!dashboardOverzicht.length) {
-    document.getElementById('dashboard-card').innerHTML = '<div class="empty">Geen actieve vaste lasten. Gebruik + Toevoegen om ze toe te voegen.</div>';
+    document.getElementById('dashboard-card').innerHTML = `<div class="empty">${t('dashboard.noActive')}</div>`;
     return;
   }
 
@@ -428,22 +427,21 @@ function renderDashboardTabel() {
     const menuItems = [];
 
     if (kanMarkeren) {
-      menuItems.push(`<button onclick="${ctx}markeerBetaald(${o.id});sluitActiesMenu()">✓ Markeer als betaald</button>`);
+      menuItems.push(`<button onclick="${ctx}markeerBetaald(${o.id});sluitActiesMenu()">${t('action.markPaid')}</button>`);
       menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="${ctx}openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">Zoek transactie</button>`);
-      menuItems.push(`<button onclick="${ctx}hermatchenLast(${o.id});sluitActiesMenu()">↺ Hermatchen</button>`);
+      menuItems.push(`<button onclick="${ctx}openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">${t('action.findTransaction')}</button>`);
+      menuItems.push(`<button onclick="${ctx}hermatchenLast(${o.id});sluitActiesMenu()">${t('action.rematch')}</button>`);
     }
     if (o.status === 'betaald' && o.handmatig_betaald) {
-      menuItems.push(`<button class="danger" onclick="${ctx}ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
+      menuItems.push(`<button class="danger" onclick="${ctx}ongedaanMarkering(${o.id});sluitActiesMenu()">${t('action.undoMark')}</button>`);
     }
     if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
       const periodeArg = isAlleMode ? `,${o.periode_id}` : '';
-      menuItems.push(`<button onclick="${ctx}toonMatchDetail(${o.id}${periodeArg});sluitActiesMenu()">Bekijk match</button>`);
+      menuItems.push(`<button onclick="${ctx}toonMatchDetail(${o.id}${periodeArg});sluitActiesMenu()">${t('action.viewMatch')}</button>`);
     }
     menuItems.push(`<div class="menu-divider"></div>`);
-    menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
-
-    menuItems.push(`<button class="danger" onclick="${ctx}verwijderLast(${o.id});sluitActiesMenu()">Verwijderen</button>`);
+    menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">${t('action.edit')}</button>`);
+    menuItems.push(`<button class="danger" onclick="${ctx}verwijderLast(${o.id});sluitActiesMenu()">${t('action.delete')}</button>`);
 
     const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
     const acties = `
@@ -460,18 +458,18 @@ function renderDashboardTabel() {
       <td${dimStijl}>${esc(o.categorie || '—')}</td>
       ${vierdeKolom}
       <td${dimStijl}><span class="badge ${o.status}">${statusLabel(o.status)}</span></td>
-      <td${dimStijl} style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}${eenmaligGeaccepteerd ? ' <span title="Bedrag eenmalig geaccepteerd" style="color:#d97706;font-weight:600">~</span>' : ''}` : o.handmatig_betaald ? '<em>handmatig</em>' : '—'}</td>
+      <td${dimStijl} style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}${eenmaligGeaccepteerd ? ' <span title="Bedrag eenmalig geaccepteerd" style="color:#d97706;font-weight:600">~</span>' : ''}` : o.handmatig_betaald ? `<em>${t('manual')}</em>` : '—'}</td>
       <td style="white-space:nowrap">${acties}</td>
     </tr>`;
   }).join('');
 
   const colspan = isAlleMode ? 8 : 7;
   const geenResultaat = gefilterd.length === 0
-    ? `<tr><td colspan="${colspan}" class="empty">Geen resultaten voor deze filter.</td></tr>` : '';
+    ? `<tr><td colspan="${colspan}" class="empty">${t('dashboard.noResults')}</td></tr>` : '';
 
   const headers = isAlleMode
-    ? '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Periode</th><th>Dag</th><th>Status</th><th>Afschrijving</th><th>Acties</th>'
-    : '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Dag v/d maand</th><th>Status</th><th>Afschrijving</th><th>Acties</th>';
+    ? `<th>${t('table.name')}</th><th>${t('table.amount')}</th><th>${t('table.category')}</th><th>${t('table.period')}</th><th>${t('table.day')}</th><th>${t('table.status')}</th><th>${t('table.debit')}</th><th>${t('table.actions')}</th>`
+    : `<th>${t('table.name')}</th><th>${t('table.amount')}</th><th>${t('table.category')}</th><th>${t('table.dayOfMonth')}</th><th>${t('table.status')}</th><th>${t('table.debit')}</th><th>${t('table.actions')}</th>`;
 
   document.getElementById('dashboard-card').innerHTML = `
     <table>
@@ -480,10 +478,6 @@ function renderDashboardTabel() {
     </table>`;
 }
 
-
-
-
-
 async function laadDashboard() {
   const sel = document.getElementById('periode-select');
   const selValue = sel.value;
@@ -491,7 +485,7 @@ async function laadDashboard() {
   huidigePeriodeId = isAlleMode ? null : (parseInt(selValue) || null);
 
   if (!huidigePeriodeId && !isAlleMode) {
-    document.getElementById('dashboard-card').innerHTML = '<div class="empty">Selecteer of maak een periode aan om te beginnen.</div>';
+    document.getElementById('dashboard-card').innerHTML = `<div class="empty">${t('dashboard.empty')}</div>`;
     document.getElementById('totalen').style.display = 'none';
     document.getElementById('dashboard-acties').style.display = 'none';
     document.getElementById('dashboard-grafieken').style.display = 'none';
@@ -526,9 +520,9 @@ async function hermatchenLast(lastId) {
   try {
     const res = await api(`/api/periodes/${huidigePeriodeId}/hermatchen/${lastId}`, { method: 'POST' });
     laadDashboard();
-    toonToast(res.gematcht ? `Match gevonden en gekoppeld.` : `Geen passende transactie gevonden.`, res.gematcht ? 'ok' : 'info');
+    toonToast(res.gematcht ? t('toast.matchFound') : t('toast.noMatch'), res.gematcht ? 'ok' : 'info');
   } catch (e) {
-    alert('Fout: ' + e.message);
+    alert(t('alert.error', { error: e.message }));
   }
 }
 
@@ -546,15 +540,15 @@ async function bulkHermatchen() {
         const res = await api(`/api/periodes/${huidigePeriodeId}/hermatchen/${i.id}`, { method: 'POST' });
         gematcht += res.gematcht || 0;
       }
-      toonToast(`${gematcht} van ${geselecteerd.length} geselecteerde lasten gematcht.`, gematcht ? 'ok' : 'info');
+      toonToast(t('toast.matchedOf', { matched: gematcht, total: geselecteerd.length }), gematcht ? 'ok' : 'info');
     } else {
       const res = await api(`/api/periodes/${huidigePeriodeId}/hermatchen`, { method: 'POST' });
       gematcht = res.gematcht || 0;
-      toonToast(`${gematcht} van ${res.hermatcht} transacties opnieuw gematcht.`, gematcht ? 'ok' : 'info');
+      toonToast(t('toast.rematchedOf', { matched: gematcht, total: res.hermatcht }), gematcht ? 'ok' : 'info');
     }
     laadDashboard();
   } catch (e) {
-    alert('Fout: ' + e.message);
+    alert(t('alert.error', { error: e.message }));
   }
 }
 
@@ -563,46 +557,47 @@ function toonMatchDetail(lastId, periodeId = null) {
     ? dashboardOverzicht.find(x => x.id === lastId && x.periode_id === periodeId)
     : dashboardOverzicht.find(x => x.id === lastId);
   if (!o || !o.betaling) return;
-  const t = o.betaling;
+  const tx = o.betaling;
 
   // Bepaal via welke regel gematcht
-  let regel = 'Bedrag + verwachte dag';
-  if (o.iban_tegenrekening && t.tegenrekening &&
-      o.iban_tegenrekening.replace(/\s/g,'') === t.tegenrekening.replace(/\s/g,'')) {
-    regel = 'IBAN tegenrekening';
-  } else if (o.omschrijving_patroon && t.omschrijving) {
+  let regelKey = 'amount';
+  if (o.iban_tegenrekening && tx.tegenrekening &&
+      o.iban_tegenrekening.replace(/\s/g,'') === tx.tegenrekening.replace(/\s/g,'')) {
+    regelKey = 'iban';
+  } else if (o.omschrijving_patroon && tx.omschrijving) {
     try {
-      if (new RegExp(o.omschrijving_patroon, 'i').test(t.omschrijving)) regel = 'Omschrijving patroon';
+      if (new RegExp(o.omschrijving_patroon, 'i').test(tx.omschrijving)) regelKey = 'pattern';
     } catch {
-      if (t.omschrijving.toLowerCase().includes(o.omschrijving_patroon.toLowerCase())) regel = 'Omschrijving patroon';
+      if (tx.omschrijving.toLowerCase().includes(o.omschrijving_patroon.toLowerCase())) regelKey = 'pattern';
     }
   }
 
+  const regelLabel = t('modal.match.rule.' + regelKey);
   const regelbadge = {
-    'IBAN tegenrekening': 'background:#dbeafe;color:#1d4ed8',
-    'Omschrijving patroon': 'background:#ede9fe;color:#6d28d9',
-    'Bedrag + verwachte dag': 'background:#fef3c7;color:#92400e'
-  }[regel] || '';
+    iban: 'background:#dbeafe;color:#1d4ed8',
+    pattern: 'background:#ede9fe;color:#6d28d9',
+    amount: 'background:#fef3c7;color:#92400e'
+  }[regelKey] || '';
 
   document.getElementById('match-detail-inhoud').innerHTML = `
     <table style="width:100%;border-collapse:collapse">
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px;width:140px">Datum</td><td style="font-size:13px">${datumNL(t.datum)}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">Bedrag</td><td style="font-size:13px;font-weight:600">${euro(t.bedrag)}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px;vertical-align:top">Omschrijving</td><td style="font-size:12px;word-break:break-word">${esc(t.omschrijving)}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">Tegenrekening</td><td style="font-size:12px;font-family:monospace">${esc(t.tegenrekening || '—')}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">Transactie-id</td><td style="font-size:12px;color:#9ca3af">#${t.id}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">Gematcht via</td><td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;${regelbadge}">${regel}</span></td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px;width:140px">${t('modal.match.date')}</td><td style="font-size:13px">${datumNL(tx.datum)}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">${t('modal.match.amount')}</td><td style="font-size:13px;font-weight:600">${euro(tx.bedrag)}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px;vertical-align:top">${t('modal.match.desc')}</td><td style="font-size:12px;word-break:break-word">${esc(tx.omschrijving)}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">${t('modal.match.counter')}</td><td style="font-size:12px;font-family:monospace">${esc(tx.tegenrekening || '—')}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">${t('modal.match.txId')}</td><td style="font-size:12px;color:#9ca3af">#${tx.id}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">${t('modal.match.matchedBy')}</td><td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;${regelbadge}">${regelLabel}</span></td></tr>
     </table>`;
   const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
-  const heeftAfwijking = !o.variabel && Math.abs(Math.abs(t.bedrag) - o.bedrag) > afwijkingDrempel;
+  const heeftAfwijking = !o.variabel && Math.abs(Math.abs(tx.bedrag) - o.bedrag) > afwijkingDrempel;
   const accepteerKnop = document.getElementById('btn-accepteer-bedrag');
   const accepteerEenmaligKnop = document.getElementById('btn-accepteer-bedrag-eenmalig');
   if (heeftAfwijking) {
-    accepteerKnop.textContent = `Accepteer ${euro(Math.abs(t.bedrag))} als nieuw bedrag`;
+    accepteerKnop.textContent = t('btn.acceptAsNew', { amount: euro(Math.abs(tx.bedrag)) });
     accepteerKnop.dataset.lastId = lastId;
     accepteerKnop.dataset.periodeId = periodeId || '';
     accepteerKnop.style.display = '';
-    accepteerEenmaligKnop.textContent = `Accepteer ${euro(Math.abs(t.bedrag))} eenmalig`;
+    accepteerEenmaligKnop.textContent = t('btn.acceptOnce', { amount: euro(Math.abs(tx.bedrag)) });
     accepteerEenmaligKnop.dataset.lastId = lastId;
     accepteerEenmaligKnop.dataset.periodeId = periodeId || '';
     accepteerEenmaligKnop.style.display = '';
@@ -612,7 +607,7 @@ function toonMatchDetail(lastId, periodeId = null) {
   }
 
   document.getElementById('match-detail-naam').textContent = o.naam;
-  document.getElementById('btn-match-ongedaan').dataset.transactieId = t.id;
+  document.getElementById('btn-match-ongedaan').dataset.transactieId = tx.id;
   openModal('modal-match-detail');
 }
 
@@ -666,13 +661,13 @@ function toonToast(tekst, type = 'ok') {
 }
 
 async function markeerVerledenBetaald() {
-  if (!confirm('Alle open vaste lasten in verleden periodes markeren als betaald?')) return;
+  if (!confirm(t('alert.markAllPast'))) return;
   try {
     const res = await api('/api/periodes/markeer-verleden-betaald', { method: 'POST' });
-    alert(`${res.gemarkt} lasten gemarkeerd in ${res.periodes} verleden periode(s).`);
+    alert(t('alert.markedPast', { count: res.gemarkt, periods: res.periodes }));
     laadDashboard();
   } catch (e) {
-    alert('Fout: ' + e.message);
+    alert(t('alert.error', { error: e.message }));
   }
 }
 
@@ -687,7 +682,8 @@ async function ongedaanMarkering(lastId) {
 }
 
 function statusLabel(s) {
-  return { betaald: 'Betaald', open: 'Open', verwacht: 'Verwacht', overgeslagen: 'Overgeslagen', inactief: 'Inactief' }[s] || s;
+  const map = { betaald: 'status.paid', open: 'status.open', verwacht: 'status.expected', overgeslagen: 'status.skipped', inactief: 'status.inactive' };
+  return map[s] ? t(map[s]) : s;
 }
 
 function toggleActiesMenu(btn, event) {
@@ -702,12 +698,11 @@ function sluitActiesMenu() {
   document.querySelectorAll('.acties-dropdown.open').forEach(d => d.classList.remove('open'));
 }
 
-
 async function openZoekTransactie(lastId, lastNaam) {
   document.getElementById('zoek-last-id').value = lastId;
   document.getElementById('zoek-last-naam').textContent = lastNaam;
   document.getElementById('zoek-filter').value = '';
-  document.getElementById('zoek-transacties-body').innerHTML = '<tr><td colspan="5" class="empty">Laden...</td></tr>';
+  document.getElementById('zoek-transacties-body').innerHTML = `<tr><td colspan="5" class="empty">${t('transactions.loading')}</td></tr>`;
   openModal('modal-zoek-transactie');
 
   // Haal alle ongekoppelde transacties op (inclusief genegeerde)
@@ -724,22 +719,22 @@ function renderZoekTransacties(filter) {
   const lastId = parseInt(document.getElementById('zoek-last-id').value);
   const tbody = document.getElementById('zoek-transacties-body');
   const bron = window._zoekTransacties || ongekoppeldeTransacties;
-  const gefilterd = bron.filter(t =>
+  const gefilterd = bron.filter(tx =>
     !filter ||
-    t.omschrijving.toLowerCase().includes(filter) ||
-    (t.tegenrekening || '').toLowerCase().includes(filter)
+    tx.omschrijving.toLowerCase().includes(filter) ||
+    (tx.tegenrekening || '').toLowerCase().includes(filter)
   );
   if (!gefilterd.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty">Geen ongekoppelde transacties gevonden.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">${t('zoek.noUncoupled')}</td></tr>`;
     return;
   }
-  tbody.innerHTML = gefilterd.map(t => `
+  tbody.innerHTML = gefilterd.map(tx => `
     <tr>
-      <td>${datumNL(t.datum)}</td>
-      <td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.omschrijving)}</td>
-      <td>${euro(t.bedrag)}</td>
-      <td style="font-size:11px;color:#6b7280">${esc(t.tegenrekening)}</td>
-      <td><button class="btn btn-sm btn-primary" onclick="koppelVanuitLast(${t.id}, ${lastId})">Koppelen</button></td>
+      <td>${datumNL(tx.datum)}</td>
+      <td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(tx.omschrijving)}</td>
+      <td>${euro(tx.bedrag)}</td>
+      <td style="font-size:11px;color:#6b7280">${esc(tx.tegenrekening)}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="koppelVanuitLast(${tx.id}, ${lastId})">${t('btn.link')}</button></td>
     </tr>
   `).join('');
 }
@@ -753,7 +748,7 @@ async function ontkoppelTransactie(transactieId) {
     });
     laadDashboard();
   } catch (e) {
-    alert('Fout: ' + e.message);
+    alert(t('alert.error', { error: e.message }));
   }
 }
 
@@ -768,7 +763,6 @@ async function koppelVanuitLast(transactieId, lastId) {
   laadDashboard();
 }
 
-
 // ============================================================
 // TRANSACTIES ZOEKEN
 // ============================================================
@@ -776,7 +770,7 @@ function openTransacties() {
   // Vul periode-filter met alle periodes
   const sel = document.getElementById('transacties-periode-filter');
   const huidig = sel.value;
-  sel.innerHTML = '<option value="">Alle periodes</option>' +
+  sel.innerHTML = `<option value="">${t('filter.allPeriods')}</option>` +
     allPeriodes.map(p => `<option value="${p.id}">${periodeNaam(p)} ${p.start_datum.slice(0,4)}</option>`).join('');
   if (huidig) sel.value = huidig;
   zoekTransacties();
@@ -788,11 +782,11 @@ async function zoekTransacties() {
   const tbody = document.getElementById('transacties-zoek-body');
 
   if (!q && !periodeId) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">Voer een zoekterm in of selecteer een periode.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">${t('transactions.empty.prompt')}</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = '<tr><td colspan="6" class="empty">Laden...</td></tr>';
+  tbody.innerHTML = `<tr><td colspan="6" class="empty">${t('transactions.loading')}</td></tr>`;
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   if (periodeId) params.set('periode_id', periodeId);
@@ -800,30 +794,30 @@ async function zoekTransacties() {
   const rijen = await api('/api/transacties?' + params);
 
   if (!rijen.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">Geen transacties gevonden.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">${t('transactions.empty.none')}</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = rijen.map(t => {
-    const periode = allPeriodes.find(p => p.id === t.periode_id);
+  tbody.innerHTML = rijen.map(tx => {
+    const periode = allPeriodes.find(p => p.id === tx.periode_id);
     return `<tr>
-      <td style="white-space:nowrap">${datumNL(t.datum)}</td>
-      <td style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.omschrijving)}</td>
-      <td style="white-space:nowrap">${euro(t.bedrag)}</td>
-      <td style="font-size:11px;color:#6b7280">${esc(t.tegenrekening || '—')}</td>
+      <td style="white-space:nowrap">${datumNL(tx.datum)}</td>
+      <td style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(tx.omschrijving)}</td>
+      <td style="white-space:nowrap">${euro(tx.bedrag)}</td>
+      <td style="font-size:11px;color:#6b7280">${esc(tx.tegenrekening || '—')}</td>
       <td style="font-size:12px;white-space:nowrap">${periode ? periodeNaam(periode) + ' ' + periode.start_datum.slice(0,4) : '—'}</td>
-      <td style="font-size:12px;color:#6b7280">${t.last_naam ? esc(t.last_naam) : '<span style="color:#d1d5db">—</span>'}</td>
+      <td style="font-size:12px;color:#6b7280">${tx.last_naam ? esc(tx.last_naam) : '<span style="color:#d1d5db">—</span>'}</td>
     </tr>`;
   }).join('');
 }
 
 function openModalNieuweLastVanTransactie(transactieId) {
-  const t = ongekoppeldeTransacties.find(x => x.id === transactieId);
-  if (!t) return;
+  const tx = ongekoppeldeTransacties.find(x => x.id === transactieId);
+  if (!tx) return;
   document.getElementById('nltv-transactie-id').value = transactieId;
-  document.getElementById('nltv-naam').value = t.omschrijving;
-  document.getElementById('nltv-bedrag').value = Math.abs(t.bedrag).toFixed(2);
-  document.getElementById('nltv-iban').value = t.tegenrekening || '';
+  document.getElementById('nltv-naam').value = tx.omschrijving;
+  document.getElementById('nltv-bedrag').value = Math.abs(tx.bedrag).toFixed(2);
+  document.getElementById('nltv-iban').value = tx.tegenrekening || '';
   document.getElementById('nltv-dag').value = '';
   document.getElementById('nltv-categorie').value = '';
   document.getElementById('nltv-patroon').value = '';
@@ -861,14 +855,12 @@ async function koppelTransactie(transactieId, lastId) {
 }
 
 async function biedLeerAan(transactieId, lastId, bronTransacties) {
-  const transactie = (bronTransacties || []).find(t => t.id === transactieId);
+  const transactie = (bronTransacties || []).find(tx => tx.id === transactieId);
   const last = allLasten.find(l => l.id === lastId);
   if (!transactie || !last) return;
 
   if (transactie.tegenrekening && !last.iban_tegenrekening) {
-    const bevestig = confirm(
-      `"${last.naam}" heeft nog geen IBAN opgeslagen.\n\nWil je "${transactie.tegenrekening}" opslaan zodat toekomstige imports automatisch matchen?`
-    );
+    const bevestig = confirm(t('alert.learnIban', { name: last.naam, iban: transactie.tegenrekening }));
     if (bevestig) {
       // Sla globaal op (fallback voor jaren zonder override)
       await api(`/api/lasten/${lastId}`, {
@@ -906,7 +898,7 @@ function openModalImport() {
 
 async function previewImport() {
   const file = document.getElementById('import-file').files[0];
-  if (!file) { alert('Selecteer een bestand.'); return; }
+  if (!file) { alert(t('alert.selectFile')); return; }
 
   const form = new FormData();
   form.append('bestand', file);
@@ -915,14 +907,14 @@ async function previewImport() {
   importPreviewData = data.transacties;
 
   document.getElementById('import-samenvatting').textContent =
-    `${data.totaal} transacties gevonden in "${file.name}"`;
+    t('import.summary', { total: data.totaal, filename: file.name });
 
-  document.getElementById('import-preview-body').innerHTML = importPreviewData.map(t => `
+  document.getElementById('import-preview-body').innerHTML = importPreviewData.map(tx => `
     <tr>
-      <td>${datumNL(t.datum)}</td>
-      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.omschrijving)}</td>
-      <td>${euro(t.bedrag)}</td>
-      <td style="font-size:11px">${esc(t.tegenrekening)}</td>
+      <td>${datumNL(tx.datum)}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(tx.omschrijving)}</td>
+      <td>${euro(tx.bedrag)}</td>
+      <td style="font-size:11px">${esc(tx.tegenrekening)}</td>
     </tr>
   `).join('');
 
@@ -938,13 +930,13 @@ async function slaImportOp() {
       body: JSON.stringify({ transacties: importPreviewData })
     });
     sluitModal('modal-import');
-    let msg = `${res.opgeslagen} transacties geïmporteerd, ${res.gematcht} automatisch gekoppeld.`;
-    if (res.dubbel > 0) msg += `\n${res.dubbel} al bestaande transacties overgeslagen (geen dubbelen).`;
-    if (res.geenPeriode > 0) msg += `\n${res.geenPeriode} transacties vallen buiten alle periodes en zijn overgeslagen.`;
+    let msg = t('import.result', { saved: res.opgeslagen, matched: res.gematcht });
+    if (res.dubbel > 0) msg += t('import.duplicates', { count: res.dubbel });
+    if (res.geenPeriode > 0) msg += t('import.noPeriod', { count: res.geenPeriode });
     alert(msg);
     laadDashboard();
   } catch (e) {
-    alert('Fout bij importeren: ' + e.message);
+    alert(t('alert.importError', { error: e.message }));
   }
 }
 
@@ -1003,14 +995,14 @@ async function laadGrafieken() {
       labels: data.periodeData.map(p => p.label),
       datasets: [
         {
-          label: 'Verwacht',
+          label: t('charts.dataset.expected'),
           data: data.periodeData.map(p => p.verwacht),
           backgroundColor: '#dbeafe',
           borderColor: '#1d4ed8',
           borderWidth: 1
         },
         {
-          label: 'Betaald',
+          label: t('charts.dataset.paid'),
           data: data.periodeData.map(p => p.betaald),
           backgroundColor: '#bbf7d0',
           borderColor: '#16a34a',
@@ -1034,7 +1026,6 @@ async function laadGrafieken() {
   });
 }
 
-
 // ============================================================
 // INSTELLINGEN
 // ============================================================
@@ -1054,7 +1045,7 @@ async function openModalInstellingen() {
 function renderInstPeriodes() {
   const tbody = document.getElementById('inst-periodes-body');
   if (!allPeriodes.length) {
-    tbody.innerHTML = '<tr><td colspan="3" class="empty" style="font-size:12px">Geen periodes.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="3" class="empty" style="font-size:12px">${t('periods.empty')}</td></tr>`;
     return;
   }
   tbody.innerHTML = allPeriodes.map(p => `
@@ -1069,47 +1060,66 @@ function renderInstPeriodes() {
 }
 
 async function verwijderPeriodeVanuitInstellingen(id) {
-  if (!confirm('Periode en alle bijbehorende transacties verwijderen?')) return;
+  if (!confirm(t('alert.deletePeriod'))) return;
   try {
     await api(`/api/periodes/${id}`, { method: 'DELETE' });
     if (huidigePeriodeId === id) huidigePeriodeId = null;
     await laadPeriodes();
     renderInstPeriodes();
     laadDashboard();
-    toonToast('Periode verwijderd.', 'ok');
+    toonToast(t('toast.periodDeleted'), 'ok');
   } catch (e) {
-    toonToast('Verwijderen mislukt: ' + e.message, 'fout');
+    toonToast(t('toast.deleteFailed', { error: e.message }), 'fout');
   }
 }
 
 async function slaInstellingenOp() {
   const dag = parseInt(document.getElementById('inst-salaris-dag').value);
-  if (!dag || dag < 1 || dag > 31) { alert('Voer een geldige dag in (1-31).'); return; }
+  if (!dag || dag < 1 || dag > 31) { alert(t('alert.salaryDayInvalid')); return; }
   await api('/api/instellingen/salaris_dag', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ waarde: dag }) });
   appInstellingen.salaris_dag = String(dag);
   sluitModal('modal-instellingen');
-  toonToast('Instellingen opgeslagen.', 'ok');
+  toonToast(t('toast.settingsSaved'), 'ok');
+}
+
+async function verwijderJaarPeriodes() {
+  const jaar = parseInt(document.getElementById('inst-genereer-jaar').value);
+  if (!jaar) { alert(t('alert.yearInvalid')); return; }
+  if (!confirm(t('alert.deleteYear', { year: jaar }))) return;
+  try {
+    const res = await api(`/api/periodes/jaar/${jaar}`, { method: 'DELETE' });
+    if (huidigePeriodeId) {
+      const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+      if (periode && periode.start_datum.startsWith(String(jaar))) huidigePeriodeId = null;
+    }
+    await laadPeriodes();
+    renderInstPeriodes();
+    laadDashboard();
+    toonToast(t('toast.yearDeleted', { year: jaar }), 'ok');
+  } catch (e) {
+    alert(t('alert.error', { error: e.message }));
+  }
 }
 
 async function genereerPeriodes() {
   const jaar = parseInt(document.getElementById('inst-genereer-jaar').value);
-  if (!jaar) { alert('Voer een geldig jaar in.'); return; }
+  if (!jaar) { alert(t('alert.yearInvalid')); return; }
   try {
     const res = await api(`/api/periodes/genereer/${jaar}`, { method: 'POST' });
     await laadPeriodes();
     renderInstPeriodes();
     const msg = res.aangemaakt
-      ? `${res.aangemaakt} periode(s) aangemaakt voor ${jaar}.${res.overgeslagen ? ` ${res.overgeslagen} overgeslagen (bestaan al).` : ''}`
-      : `Alle periodes voor ${jaar} bestaan al.`;
+      ? t('periods.generated', { count: res.aangemaakt, year: jaar }) + (res.overgeslagen ? ` ${t('periods.generatedSkipped', { count: res.overgeslagen })}` : '')
+      : t('periods.allExist', { year: jaar });
     toonToast(msg, res.aangemaakt ? 'ok' : 'info');
   } catch (e) {
-    alert('Fout: ' + e.message);
+    alert(t('alert.error', { error: e.message }));
   }
 }
 
 // December-reminder
 function toonDecemberPopup(volgendJaar) {
-  document.getElementById('december-jaar-tekst').textContent = volgendJaar;
+  document.getElementById('december-tekst').innerHTML = t('modal.december.text', { year: volgendJaar });
   openModal('modal-december');
 }
 
@@ -1121,9 +1131,9 @@ async function decemberGenereer() {
   try {
     const res = await api(`/api/periodes/genereer/${volgendJaar}`, { method: 'POST' });
     await laadPeriodes();
-    toonToast(`${res.aangemaakt} periodes aangemaakt voor ${volgendJaar}.`, 'ok');
+    toonToast(t('periods.decemberGenerated', { count: res.aangemaakt, year: volgendJaar }), 'ok');
   } catch (e) {
-    alert('Fout: ' + e.message);
+    alert(t('alert.error', { error: e.message }));
   }
 }
 
@@ -1155,7 +1165,7 @@ async function handleLogin(e) {
     });
     if (!r.ok) {
       const data = await r.json();
-      errorEl.textContent = data.error || 'Inloggen mislukt';
+      errorEl.textContent = data.error || t('login.error.failed');
       errorEl.style.display = 'block';
       return;
     }
@@ -1163,13 +1173,25 @@ async function handleLogin(e) {
     document.getElementById('app-layout').style.display = '';
     await startApp();
   } catch {
-    errorEl.textContent = 'Verbindingsfout';
+    errorEl.textContent = t('login.error.connection');
     errorEl.style.display = 'block';
   }
 }
 
 async function startApp() {
   await Promise.all([laadLasten(), laadPeriodes(), laadInstellingen()]);
+
+  // First run: no periods yet — auto-generate 12 for the current year
+  if (!allPeriodes.length) {
+    const jaar = new Date().getFullYear();
+    try {
+      const res = await api(`/api/periodes/genereer/${jaar}`, { method: 'POST' });
+      await laadPeriodes();
+      toonToast(t('periods.generated', { count: res.aangemaakt, year: jaar }), 'ok');
+    } catch (e) {
+      console.warn('Auto-generate periods failed:', e.message);
+    }
+  }
 
   if (allPeriodes.length) {
     const vandaag = new Date().toISOString().slice(0, 10);
