@@ -595,16 +595,22 @@ async function handlePeriodes(path, method, request, env) {
   // GET /periodes/:id/alle-ongekoppeld
   if ((m = matchPath('/periodes/:id/alle-ongekoppeld', path)) && method === 'GET') {
     const periode = await env.DB.prepare('SELECT * FROM periodes WHERE id=?').bind(m.id).first();
-    // Haal ook transacties op die max 20 dagen voor de periode-start vallen (ook als ze al gekoppeld zijn in vorige periode)
     const grens = new Date(periode.start_datum);
     grens.setDate(grens.getDate() - 20);
     const grensStr = grens.toISOString().slice(0, 10);
+    // Also include transactions from the next period within 5 days of its start (catches payments on/just after period boundary)
+    const volgendePeriode = await env.DB.prepare(
+      "SELECT start_datum FROM periodes WHERE start_datum > ? ORDER BY start_datum LIMIT 1"
+    ).bind(periode.start_datum).first();
+    const voorwaartseGrens = new Date(volgendePeriode ? volgendePeriode.start_datum : periode.start_datum);
+    voorwaartseGrens.setDate(voorwaartseGrens.getDate() + (volgendePeriode ? 5 : 0));
+    const voorwaartseGrensStr = voorwaartseGrens.toISOString().slice(0, 10);
     const { results } = await env.DB.prepare(
       `SELECT * FROM bank_transacties WHERE
         (periode_id=? AND gekoppeld_last_id IS NULL)
         OR (periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0)
       ORDER BY datum`
-    ).bind(m.id, m.id, grensStr, periode.start_datum).all();
+    ).bind(m.id, m.id, grensStr, voorwaartseGrensStr).all();
     return Response.json(results);
   }
 
@@ -729,15 +735,19 @@ async function handlePeriodes(path, method, request, env) {
     let gematcht = 0;
     const alleUpdates = [];
 
-    for (const p of volgendePeriodes) {
+    for (let i = 0; i < volgendePeriodes.length; i++) {
+      const p = volgendePeriodes[i];
       const effectieveLastenPeriode = applyJaarOverridesOpLasten(lasten, jaarOverrides, p.start_datum);
-      // Ook transacties uit vorige periode ophalen die dicht bij de start vallen (max 20 dagen)
       const grens = new Date(p.start_datum);
       grens.setDate(grens.getDate() - 20);
       const grensStr = grens.toISOString().slice(0, 10);
+      const volgende = volgendePeriodes[i + 1];
+      const voorwaartseGrens = new Date(volgende ? volgende.start_datum : p.start_datum);
+      voorwaartseGrens.setDate(voorwaartseGrens.getDate() + (volgende ? 5 : 0));
+      const voorwaartseGrensStr = voorwaartseGrens.toISOString().slice(0, 10);
       const [{ results: transacties }, { results: randTransacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
         env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id=? OR gekoppeld_last_id IS NULL)`).bind(p.id, lastId).all(),
-        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id IS NULL OR gekoppeld_last_id=?)`).bind(p.id, grensStr, p.start_datum, lastId).all(),
+        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id IS NULL OR gekoppeld_last_id=?)`).bind(p.id, grensStr, voorwaartseGrensStr, lastId).all(),
         env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(p.id).all(),
         env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(p.id).all(),
       ]);
@@ -750,7 +760,7 @@ async function handlePeriodes(path, method, request, env) {
           if (matchId === lastId) gematcht++;
         }
       }
-      // Rand-transacties uit vorige periode: als ze matchen, verplaats naar deze periode
+      // Rand-transacties: als ze matchen, verplaats naar deze periode
       for (const t of randTransacties) {
         const matchId = autoMatch(t, matchbare, p);
         if (matchId === lastId) {
@@ -779,15 +789,19 @@ async function handlePeriodes(path, method, request, env) {
     let gematcht = 0, hermatcht = 0;
     const alleUpdates = [];
 
-    for (const p of volgendePeriodes) {
+    for (let i = 0; i < volgendePeriodes.length; i++) {
+      const p = volgendePeriodes[i];
       const effectieveLastenPeriode = applyJaarOverridesOpLasten(lasten, jaarOverrides, p.start_datum);
-      // Ook transacties uit vorige periode ophalen die dicht bij de start vallen (max 20 dagen)
       const grens = new Date(p.start_datum);
       grens.setDate(grens.getDate() - 20);
       const grensStr = grens.toISOString().slice(0, 10);
+      const volgende = volgendePeriodes[i + 1];
+      const voorwaartseGrens = new Date(volgende ? volgende.start_datum : p.start_datum);
+      voorwaartseGrens.setDate(voorwaartseGrens.getDate() + (volgende ? 5 : 0));
+      const voorwaartseGrensStr = voorwaartseGrens.toISOString().slice(0, 10);
       const [{ results: transacties }, { results: randTransacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
         env.DB.prepare('SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0').bind(p.id).all(),
-        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0`).bind(p.id, grensStr, p.start_datum).all(),
+        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id!=? AND datum >= ? AND datum < ? AND handmatig_gekoppeld=0 AND genegeerd=0`).bind(p.id, grensStr, voorwaartseGrensStr).all(),
         env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(p.id).all(),
         env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(p.id).all(),
       ]);
@@ -800,7 +814,7 @@ async function handlePeriodes(path, method, request, env) {
         alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(lastId ?? null, t.id));
         hermatcht++;
       }
-      // Rand-transacties uit vorige periode: alleen verplaatsen als deze periode nog geen match heeft voor die last
+      // Rand-transacties: alleen verplaatsen als deze periode nog geen match heeft voor die last
       for (const t of randTransacties) {
         const lastId = autoMatch(t, matchbare, p);
         if (lastId && !alGematchteLastIds.has(lastId)) {
