@@ -5,6 +5,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.5.5] - 2026-05-08
+
+### Fixed
+- A recurring cost with an IBAN configured is no longer matched via amount fallback when the transaction has no counter-account — previously this could cause unrelated transactions with the same amount to be incorrectly matched (e.g. a €13.30 restaurant transaction matched to an insurance cost)
+
+---
+
 ## [1.5.4] - 2026-05-08
 
 ### Changed

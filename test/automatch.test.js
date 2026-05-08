@@ -85,3 +85,18 @@ describe('autoMatch — geen match', () => {
     expect(autoMatch(t, lasten, periode)).toBeNull();
   });
 });
+
+describe('autoMatch — IBAN voorkomt valse bedrag-match', () => {
+  it('does not match via bedrag when the last has an IBAN but the transaction has none', () => {
+    // Netflix (id 1) has IBAN NL91ABNA0417164300 and bedrag 17.99.
+    // A transaction with bedrag -17.99 but no tegenrekening must NOT match Netflix,
+    // because the IBAN did not match — bedrag is not a valid fallback.
+    const t = { bedrag: -17.99, tegenrekening: '', omschrijving: '', datum: '2024-01-26' };
+    expect(autoMatch(t, lasten, periode)).toBeNull();
+  });
+
+  it('does not match via bedrag when the last has an IBAN but the transaction has a different IBAN', () => {
+    const t = { bedrag: -17.99, tegenrekening: 'NL00UNKN0000000000', omschrijving: '', datum: '2024-01-26' };
+    expect(autoMatch(t, lasten, periode)).toBeNull();
+  });
+});
