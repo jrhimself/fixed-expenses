@@ -74,6 +74,16 @@ function mapBankRow(row) {
     };
   }
 
+  // Sparkasse (Germany): semicolon-separated, German column names
+  if (keys.includes('buchungstag') && keys.includes('verwendungszweck')) {
+    return {
+      datum: parseDate(row['buchungstag']),
+      bedrag: parseEuropeanAmount(row['betrag']),
+      omschrijving: row['verwendungszweck'] || row['buchungstext'] || '',
+      tegenrekening: row['kontonummer/iban'] || ''
+    };
+  }
+
   const datumKey = keys.find(k => k.includes('datum') || k.includes('date'));
   const bedragKey = keys.find(k => k.includes('bedrag') || k.includes('amount'));
   const omschrijvingKey = keys.find(k => k.includes('omschrijving') || k.includes('description') || k.includes('naam'));
