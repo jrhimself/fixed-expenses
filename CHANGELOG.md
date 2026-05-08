@@ -5,6 +5,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.5.2] - 2026-05-08
+
+### Fixed
+- Reverted forward boundary in automatic rematch — only the manual transaction search (Zoek transactie) now looks 5 days into the next period; automatic rematch stays backward-only to prevent transactions being incorrectly pulled across period boundaries
+
+---
+
 ## [1.5.1] - 2026-05-08
 
 ### Fixed
