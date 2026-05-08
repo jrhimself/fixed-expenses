@@ -426,6 +426,11 @@ function renderDashboardTabel() {
     const kanMarkeren = o.status !== 'betaald' && o.status !== 'inactief';
     const menuItems = [];
 
+    if (o.periode_inactief) {
+      menuItems.push(`<button onclick="${ctx}activeerLastVoorPeriode(${o.id});sluitActiesMenu()">${t('action.activateFromHere')}</button>`);
+      menuItems.push(`<div class="menu-divider"></div>`);
+    }
+
     if (kanMarkeren) {
       menuItems.push(`<button onclick="${ctx}markeerBetaald(${o.id});sluitActiesMenu()">${t('action.markPaid')}</button>`);
       menuItems.push(`<div class="menu-divider"></div>`);
@@ -673,6 +678,11 @@ async function markeerVerledenBetaald() {
 
 async function markeerBetaald(lastId) {
   await api(`/api/periodes/${huidigePeriodeId}/markeer/${lastId}`, { method: 'POST' });
+  laadDashboard();
+}
+
+async function activeerLastVoorPeriode(lastId) {
+  await api(`/api/periodes/${huidigePeriodeId}/activeer-last/${lastId}`, { method: 'POST' });
   laadDashboard();
 }
 
