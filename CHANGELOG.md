@@ -12,6 +12,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.4.0] - 2026-05-08
+
+### Added
+- Full internationalisation (EN/NL/DE) — language preference saved in browser
+- Sparkasse (DE) CSV import support with automatic format detection
+- Local server mode — run the app on your own machine without a Cloudflare account (Node 22+, `npm start`)
+- App screenshot in README
+
+### Changed
+- App renamed from "Vaste Lasten" to "Fixed Expenses"
+- README rewritten in English with installation options overview and separate Cloudflare hosting section
+- License updated to MIT
+- Clone URL updated to renamed GitHub repository `fixed-expenses`
+
+### Fixed
+- ESLint i18n globals declared so Cloudflare deploy no longer fails after adding i18n
+
+---
+
 ## [1.3.0] - 2026-05-05
 
 ### Changed
