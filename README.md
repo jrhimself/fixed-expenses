@@ -10,8 +10,6 @@ A personal finance web app to track recurring monthly costs, import bank stateme
 
 ![Fixed Expenses dashboard](docs/screenshot.png)
 
-> *No screenshot yet? Run the app and take one, then save it as `docs/screenshot.png`.*
-
 ---
 
 ## Getting Started
