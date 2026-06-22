@@ -5,6 +5,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.5.7] - 2026-06-22
+
+### Fixed
+- A recurring cost with an `omschrijving_patroon` (description pattern) is no longer matched via the amount fallback. Previously, if the pattern did not match a transaction's description, the cost could still be matched to an unrelated transaction that happened to share the same amount and a nearby expected day (e.g. a "Tesla Premium" cost matching a "Zakgeld Joey" transfer). A cost with an explicit description pattern now matches only on that pattern, never blindly on amount — mirroring the existing IBAN exclusion
+
+---
+
 ## [1.5.6] - 2026-06-22
 
 ### Fixed
