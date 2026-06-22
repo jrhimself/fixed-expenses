@@ -9,6 +9,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ### Fixed
 - The "~" marker (amount accepted once) now disappears after the deviating amount is accepted as the new defined amount. Previously the marker stayed because it was driven solely by the stored flag, ignoring whether the payment still differed from the defined amount; the marker is now only shown while an actual deviation remains
+- Frontend version label and asset cache-busting query strings now reflect 1.5.6 (previously left at 1.5.5, so the app kept showing the old version and could serve cached assets)
 
 ---
 
