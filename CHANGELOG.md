@@ -5,6 +5,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.5.6] - 2026-06-22
+
+### Fixed
+- The "~" marker (amount accepted once) now disappears after the deviating amount is accepted as the new defined amount. Previously the marker stayed because it was driven solely by the stored flag, ignoring whether the payment still differed from the defined amount; the marker is now only shown while an actual deviation remains
+
+---
+
 ## [1.5.5] - 2026-05-08
 
 ### Fixed

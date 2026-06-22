@@ -396,9 +396,9 @@ function toggleGrafieken(btn) {
 
 function renderRij(o, isAlleMode) {
   const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
-  const eenmaligGeaccepteerd = o.betaling?.bedrag_afwijking_geaccepteerd === 1;
-  const bedragAfwijking = !o.variabel && !eenmaligGeaccepteerd && o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
-    Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
+  const heeftAfwijking = !!o.betaling && Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
+  const eenmaligGeaccepteerd = o.betaling?.bedrag_afwijking_geaccepteerd === 1 && heeftAfwijking;
+  const bedragAfwijking = !o.variabel && !eenmaligGeaccepteerd && o.status === 'betaald' && !o.handmatig_betaald && heeftAfwijking;
 
   const ctx = isAlleMode ? `setAlleModePeriode(${o.periode_id});` : '';
   const periodeLabel = isAlleMode && o.periode_start ? periodeNaam({ start_datum: o.periode_start }) : null;
