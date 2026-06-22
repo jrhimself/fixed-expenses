@@ -79,6 +79,26 @@ describe('autoMatch — bedrag + verwachte dag', () => {
   });
 });
 
+describe('autoMatch — omschrijving_patroon voorkomt valse bedrag-match', () => {
+  it('does not match via bedrag when the last has an omschrijving_patroon that does not match', () => {
+    // A cost with an explicit description pattern (e.g. "Tesla") must NOT match an unrelated
+    // transaction ("Zakgeld Joey") that merely shares the same amount and a nearby expected day.
+    const teslaLasten = [
+      { id: 7, naam: 'Tesla Premium', bedrag: 9.99, iban_tegenrekening: '', omschrijving_patroon: 'tesla', verwachte_dag: 3 },
+    ];
+    const t = { bedrag: -9.99, tegenrekening: '', omschrijving: 'Zakgeld Joey naar Zakgeld Joey', datum: '2024-02-03' };
+    expect(autoMatch(t, teslaLasten, periode)).toBeNull();
+  });
+
+  it('still matches that same last when the description actually matches the pattern', () => {
+    const teslaLasten = [
+      { id: 7, naam: 'Tesla Premium', bedrag: 9.99, iban_tegenrekening: '', omschrijving_patroon: 'tesla', verwachte_dag: 3 },
+    ];
+    const t = { bedrag: -9.99, tegenrekening: '', omschrijving: 'Tesla Premium Connectivity', datum: '2024-02-03' };
+    expect(autoMatch(t, teslaLasten, periode)).toBe(7);
+  });
+});
+
 describe('autoMatch — geen match', () => {
   it('returns null when nothing matches', () => {
     const t = { bedrag: -999.00, tegenrekening: 'NL00UNKN0000000000', omschrijving: 'onbekend', datum: '2024-01-26' };
